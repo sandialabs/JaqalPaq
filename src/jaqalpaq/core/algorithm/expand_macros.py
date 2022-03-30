@@ -52,6 +52,7 @@ class MacroExpander(Visitor):
         new_circuit.constants.update(circuit.constants)
         new_circuit.registers.update(circuit.registers)
         new_circuit.body.statements.extend(self.visit(circuit.body).statements)
+        new_circuit.usepulses.extend(circuit.usepulses)
         return new_circuit
 
     def visit_LoopStatement(self, loop):
