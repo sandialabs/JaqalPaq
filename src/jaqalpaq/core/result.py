@@ -6,6 +6,14 @@ from collections import OrderedDict
 
 from .algorithm import fill_in_let, expand_macros
 from .algorithm.walkers import *
+from jaqalpaq.error import JaqalError
+
+
+# Warn if a probability is greater than CUTOFF_WARN, and
+# throw an exception if it's above CUTOFF_FAIL.
+CUTOFF_FAIL = 2e-6
+CUTOFF_WARN = 1e-13
+assert CUTOFF_WARN <= CUTOFF_FAIL
 
 
 def parse_jaqal_output_list(circuit, output):
@@ -195,51 +203,49 @@ class ReadoutSubcircuit(RelativeFrequencySubcircuit):
         return self._readouts
 
 
+def validate_probabilities(probabilities):
+    # Don't require numpy in the experiment
+    import numpy
+
+    p = numpy.asarray(probabilities)
+
+    # We normalize the probabilities if they are outside the range [0,1]
+    p_clipped = numpy.clip(p, 0, 1)
+    clip_err = numpy.abs(p_clipped - p).max()
+
+    p = p_clipped
+
+    # We also normalize their sum.
+    total = p.sum()
+    total_err = numpy.abs(total - 1)
+    if total_err > 0:
+        p /= total
+
+    #
+    # This is done to account for minor numerical error. If the change
+    # is significant, you should be suspicious of the results.
+    #
+
+    err = max(total_err, clip_err)
+    if err > CUTOFF_WARN:
+        msg = f"Error in probabilities {err}"
+        if err > CUTOFF_FAIL:
+            raise JaqalError(msg)
+        warnings.warn(msg, category=RuntimeWarning)
+
+    return p
+
+
 class ProbabilisticSubcircuit(Subcircuit):
     """Encapsulate one part of the circuit between a prepare_all and measure_all gate.
 
     Also track the theoretical probability distribution of measurement results.
     """
 
-    # Warn if a probability is greater than CUTOFF_WARN, and
-    # throw an exception if it's above CUTOFF_FAIL.
-    CUTOFF_FAIL = 2e-6
-    CUTOFF_WARN = 1e-13
-    assert CUTOFF_WARN <= CUTOFF_FAIL
-
     def __init__(self, *args, probabilities, **kwargs):
         """(internal) Instantiate a Subcircuit"""
         super().__init__(*args, **kwargs)
-        # Don't require numpy in the experiment
-        import numpy
-
-        p = numpy.asarray(probabilities)
-
-        # We normalize the probabilities if they are outside the range [0,1]
-        p_clipped = numpy.clip(p, 0, 1)
-        clip_err = numpy.abs(p_clipped - p).max()
-
-        p = p_clipped
-
-        # We also normalize their sum.
-        total = p.sum()
-        total_err = numpy.abs(total - 1)
-        if total_err > 0:
-            p /= total
-
-        self._probabilities = p
-
-        #
-        # This is done to account for minor numerical error. If the change
-        # is significant, you should be suspicious of the results.
-        #
-
-        err = max(total_err, clip_err)
-        if err > self.CUTOFF_WARN:
-            msg = f"Error in probabilities {err} in {self}"
-            if err > self.CUTOFF_FAIL:
-                raise RuntimeError(msg)
-            warnings.warn(msg, category=RuntimeWarning)
+        self._probabilities = validate_probabilities(probabilities)
 
     @property
     def simulated_probability_by_int(self):
