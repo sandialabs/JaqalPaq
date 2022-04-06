@@ -23,7 +23,9 @@ from jaqalpaq.error import JaqalError
 from jaqalpaq.parser import parse_jaqal_file, parse_jaqal_string
 
 
-def run_jaqal_circuit(circuit, backend=None, force_sim=False, emulator_backend=None):
+def run_jaqal_circuit(
+    circuit, backend=None, force_sim=False, emulator_backend=None, **kwargs
+):
     """Execute a Jaqal :class:`~jaqalpaq.core.Circuit` using either an
     emulator or by communicating over IPC with another process.
 
@@ -62,7 +64,7 @@ def run_jaqal_circuit(circuit, backend=None, force_sim=False, emulator_backend=N
 
         backend = UnitarySerializedEmulator()
 
-    return backend(circuit).execute()
+    return backend(circuit, **kwargs).execute()
 
 
 def run_jaqal_string(jaqal, import_path=None, **kwargs):
