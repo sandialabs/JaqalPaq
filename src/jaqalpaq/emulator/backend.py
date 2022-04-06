@@ -7,50 +7,9 @@ from numpy.random import choice
 
 from jaqalpaq.core.result import ExecutionResult, Readout
 from jaqalpaq.core.result import ProbabilisticSubcircuit
-from jaqalpaq.core.algorithm.walkers import TraceVisitor, DiscoverSubcircuits
+from jaqalpaq.core.algorithm.walkers import TraceVisitor
 
-
-class AbstractJob:
-    """Abstract Jaqal Compute Job"""
-
-    def __init__(self, backend, circuit):
-        self.backend = backend
-        self.circuit = circuit
-
-    def __repr__(self):
-        return f"<{type(self)} of {self.backend}>"
-
-    @abc.abstractmethod
-    def execute(self):
-        """Executes the job on the backend"""
-
-
-class AbstractBackend:
-    """Abstract Emulator Backend"""
-
-    @abc.abstractmethod
-    def __call__(self, circ):
-        """Creates a job object for circ
-
-        :param Circuit circ: circuit to run
-        """
-
-    def get_n_qubits(self, circ):
-        """Returns the number of qubits the backend will simulate/emulate.
-
-        Specifically, it will be the number of qubits in the considered circuit.
-
-        :param circ: The circuit object being emulated/simulated.
-        """
-
-        registers = circ.fundamental_registers()
-
-        try:
-            (register,) = registers
-        except ValueError:
-            raise NotImplementedError("Multiple fundamental registers unsupported.")
-
-        return register.size
+from jaqalpaq.run.backend import IndependentSubcircuitsBackend, AbstractBackend
 
 
 class ExtensibleBackend(AbstractBackend):
@@ -150,7 +109,7 @@ class ExtensibleBackend(AbstractBackend):
         return gate_models
 
 
-class IndependentSubcircuitsEmulatorWalker(TraceVisitor):
+class ReadoutGeneratingWalker(TraceVisitor):
     def __init__(self, traces, subcircuits):
         """(internal) Instantiates an EmulationWalker.
 
@@ -177,31 +136,19 @@ class IndependentSubcircuitsEmulatorWalker(TraceVisitor):
         self.readout_index += 1
 
 
-class IndependentSubcircuitsJob(AbstractJob):
-    """Job for circuit with subcircuits that are independent"""
-
-    def execute(self):
-        w = IndependentSubcircuitsEmulatorWalker(self.traces, self.subcircuits)
-        w.visit(self.circuit)
-        return ExecutionResult(self.subcircuits, w.results)
-
-
-class IndependentSubcircuitsBackend(AbstractBackend):
+class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     """Abstract emulator backend for subcircuits that are independent"""
 
-    def __call__(self, circ):
-        """Attaches the backend to a particular circuit, creating a Job object.
+    @abc.abstractmethod
+    def _make_subcircuit(job, index, trace, circ):
+        """(internal) Produce a subcircuit given a trace"""
 
-        Calculates the probabilities of outcomes for every subcircuit.
-
-        :param Circuit circ: parent circuit
-
-        :returns IndependentSubcircuitsJob:
-        """
-
-        job = IndependentSubcircuitsJob(self, circ)
-        visitor = DiscoverSubcircuits()
-        job.traces = traces = visitor.visit(circ)
-        job.subcircuits = [self._make_subcircuit(job, *tr) for tr in enumerate(traces)]
-
-        return job
+    def _execute_job(self, job):
+        """(internal) Execute the job on the backend"""
+        subcircs = [
+            self._make_subcircuit(job, *tr, job.expanded_circuit)
+            for tr in enumerate(job.traces)
+        ]
+        w = ReadoutGeneratingWalker(job.traces, subcircs)
+        w.visit(job.expanded_circuit)
+        return ExecutionResult(subcircs, w.results)

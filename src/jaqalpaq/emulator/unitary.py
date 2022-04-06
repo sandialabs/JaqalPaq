@@ -5,7 +5,7 @@ import numpy
 
 from jaqalpaq.core.algorithm.walkers import TraceSerializer
 from jaqalpaq.core.result import ProbabilisticSubcircuit, ReadoutSubcircuit
-from jaqalpaq.emulator.backend import IndependentSubcircuitsBackend
+from jaqalpaq.emulator.backend import EmulatedIndependentSubcircuitsBackend
 
 
 class EmulatorSubcircuit(ProbabilisticSubcircuit, ReadoutSubcircuit):
@@ -25,13 +25,13 @@ class EmulatorSubcircuit(ProbabilisticSubcircuit, ReadoutSubcircuit):
         return self._state_vector
 
 
-class UnitarySerializedEmulator(IndependentSubcircuitsBackend):
+class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
     """Serialized emulator using unitary matrices
 
     This object should be treated as an opaque symbol to be passed to run_jaqal_circuit.
     """
 
-    def _make_subcircuit(self, job, index, trace):
+    def _make_subcircuit(self, job, index, trace, circ):
         """Generate the ProbabilisticSubcircuit associated with the trace of circuit
             being process in job.
 
@@ -41,7 +41,6 @@ class UnitarySerializedEmulator(IndependentSubcircuitsBackend):
         :return: A ProbabilisticSubcircuit.
         """
 
-        circ = job.circuit
         n_qubits = self.get_n_qubits(circ)
 
         hilb_dim = 2**n_qubits

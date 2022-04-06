@@ -9,7 +9,7 @@ from pygsti.protocols import ModelFreeformSimulator
 
 from jaqalpaq.core.algorithm.walkers import TraceSerializer
 from jaqalpaq.core.result import ProbabilisticSubcircuit, ReadoutSubcircuit
-from jaqalpaq.emulator.backend import IndependentSubcircuitsBackend, ExtensibleBackend
+from jaqalpaq.emulator import backend
 
 from .circuit import pygsti_circuit_from_circuit
 from .model import build_noisy_native_model
@@ -42,7 +42,7 @@ class pyGSTiSubcircuit(ProbabilisticSubcircuit, ReadoutSubcircuit):
             self._pygsti_model = pyGSTi_model
 
 
-class CircuitEmulator(IndependentSubcircuitsBackend):
+class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
     """Emulator using pyGSTi circuit objects
 
     This object should be treated as an opaque symbol to be passed to run_jaqal_circuit.
@@ -53,7 +53,7 @@ class CircuitEmulator(IndependentSubcircuitsBackend):
         self.gate_durations = gate_durations if gate_durations is not None else {}
         super().__init__(*args, **kwargs)
 
-    def _make_subcircuit(self, job, index, trace):
+    def _make_subcircuit(self, job, index, trace, circ):
         """Generate the probabilities of outcomes of a subcircuit
 
         :param Trace trace: the subcircut of circ to generate probabilities for
@@ -61,7 +61,7 @@ class CircuitEmulator(IndependentSubcircuitsBackend):
         """
 
         pc = pygsti_circuit_from_circuit(
-            job.circuit, trace=trace, durations=self.gate_durations
+            circ, trace=trace, durations=self.gate_durations
         )
 
         model = self.model
@@ -82,7 +82,7 @@ class CircuitEmulator(IndependentSubcircuitsBackend):
         )
 
 
-class AbstractNoisyNativeEmulator(ExtensibleBackend, CircuitEmulator):
+class AbstractNoisyNativeEmulator(backend.ExtensibleBackend, CircuitEmulator):
     """(abstract) Noisy emulator using pyGSTi circuit objects
 
     Provides helper functions to make the generation of a noisy native model simpler.

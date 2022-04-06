@@ -21,7 +21,6 @@ import os
 
 from jaqalpaq.error import JaqalError
 from jaqalpaq.parser import parse_jaqal_file, parse_jaqal_string
-from jaqalpaq.core.algorithm import expand_macros, fill_in_let, expand_subcircuits
 
 
 def run_jaqal_circuit(circuit, backend=None, force_sim=False, emulator_backend=None):
@@ -63,8 +62,7 @@ def run_jaqal_circuit(circuit, backend=None, force_sim=False, emulator_backend=N
 
         backend = UnitarySerializedEmulator()
 
-    expanded = expand_macros(fill_in_let(expand_subcircuits(circuit)))
-    return backend(expanded).execute()
+    return backend(circuit).execute()
 
 
 def run_jaqal_string(jaqal, import_path=None, **kwargs):
