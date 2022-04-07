@@ -23,6 +23,18 @@ from jaqalpaq.error import JaqalError
 from jaqalpaq.parser import parse_jaqal_file, parse_jaqal_string
 
 
+def _get_backend():
+    if os.environ.get("JAQALPAQ_RUN_EMULATOR", "").startswith(("1", "t", "T")):
+        return
+    if os.environ.get("JAQALPAQ_RUN_PORT", False):
+        from jaqalpaq.ipc.ipc import IPCBackend
+
+        return IPCBackend()
+
+
+FORCE_BACKEND = _get_backend()
+
+
 def run_jaqal_circuit(
     circuit, backend=None, force_sim=False, emulator_backend=None, **kwargs
 ):
@@ -44,25 +56,13 @@ def run_jaqal_circuit(
         for random behavior.
 
     """
-    runner_type, runner_port = _get_runner()
-    if runner_type == "ipc" and not force_sim:
-        return jaqalpaq.ipc.ipc.run_jaqal_circuit(circuit, **kwargs)
-    elif runner_type != "emulator":
-        raise JaqalError("Internal error: unknown runner")
+    if FORCE_BACKEND is None:
+        if backend is None:
+            from jaqalpaq.emulator.unitary import UnitarySerializedEmulator
 
-    if emulator_backend is not None:
-        import warnings
-
-        warnings.warn("emulator_backend is deprecated, please use backend instead.")
-
-        if backend is not None:
-            raise JaqalError("backend and emulator_backend cannot both be set!")
-        backend = emulator_backend
-
-    if backend is None:
-        from jaqalpaq.emulator.unitary import UnitarySerializedEmulator
-
-        backend = UnitarySerializedEmulator()
+            backend = UnitarySerializedEmulator()
+    else:
+        backend = FORCE_BACKEND
 
     return backend(circuit, **kwargs).execute()
 
@@ -106,14 +106,8 @@ def run_jaqal_file(fname, import_path=None, **kwargs):
     )
 
 
-def _get_runner():
-    """Return whether we should use the emulator or ipc, and if the
-    latter, what port to use."""
-    if os.environ.get("JAQALPAQ_RUN_EMULATOR", "").startswith(("1", "t", "T")):
-        return "emulator", None
-    try:
-        port = int(os.environ["JAQALPAQ_RUN_PORT"])
-    except:
-        return "emulator", None
-    else:
-        return "ipc", port
+__all__ = [
+    "run_jaqal_string",
+    "run_jaqal_file",
+    "run_jaqal_circuit",
+]
