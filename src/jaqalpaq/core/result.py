@@ -121,6 +121,11 @@ class Subcircuit:
     def __repr__(self):
         return f"<{type(self).__name__} {self._index}@{self._trace.end}>"
 
+    def copy(self):
+        new = object.__new__(type(self))
+        new.__dict__.update(self.__dict__)
+        return new
+
 
 class RelativeFrequencySubcircuit(Subcircuit):
     """Encapsulate one part of the circuit between a prepare_all and measure_all gate.
