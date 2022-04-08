@@ -27,7 +27,7 @@ def _get_backend():
     if os.environ.get("JAQALPAQ_RUN_EMULATOR", "").startswith(("1", "t", "T")):
         return
     if os.environ.get("JAQALPAQ_RUN_PORT", False):
-        from jaqalpaq.ipc.ipc import IPCBackend
+        from jaqalpaq.ipc.client import IPCBackend
 
         return IPCBackend()
 

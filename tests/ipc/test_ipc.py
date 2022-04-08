@@ -2,7 +2,7 @@ import os, time, sys, subprocess, socket
 import unittest, pytest
 import numpy
 
-from jaqalpaq.ipc.ipc import IPCBackend
+from jaqalpaq.ipc.client import IPCBackend
 from jaqalpaq.parser import parse_jaqal_file
 from jaqalpaq.run import run_jaqal_circuit
 
@@ -17,7 +17,10 @@ class IPCTester(unittest.TestCase):
         host_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
         try:
-            P = subprocess.Popen([sys.executable, "-mtests.ipc._mock_server"])
+            P = subprocess.Popen(
+                [sys.executable, "-mjaqalpaq.ipc.server", "-U", IPC_SOCKET, "-r0"]
+            )
+
             time.sleep(1)
             host_socket.connect(IPC_SOCKET)
 
