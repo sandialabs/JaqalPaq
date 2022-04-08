@@ -64,12 +64,18 @@ class MacroExpander(Visitor):
             new_stmt = self.visit(stmt)
             if (
                 isinstance(new_stmt, BlockStatement)
+                and (not new_stmt.subcircuit)
                 and new_stmt.parallel == block.parallel
             ):
                 new_statements.extend(new_stmt.statements)
             else:
                 new_statements.append(new_stmt)
-        return BlockStatement(parallel=block.parallel, statements=new_statements)
+        return BlockStatement(
+            parallel=block.parallel,
+            subcircuit=block.subcircuit,
+            iterations=block.iterations,
+            statements=new_statements,
+        )
 
     def visit_GateStatement(self, gate):
         return replace_gate(gate, self.macros)
@@ -106,6 +112,8 @@ class GateReplacer(Visitor):
     def visit_BlockStatement(self, block: BlockStatement):
         return BlockStatement(
             parallel=block.parallel,
+            subcircuit=block.subcircuit,
+            iterations=block.iterations,
             statements=[self.visit(stmt) for stmt in block.statements],
         )
 

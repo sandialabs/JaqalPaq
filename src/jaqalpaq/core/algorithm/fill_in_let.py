@@ -63,11 +63,13 @@ class LetFiller(Visitor):
 
     def visit_BlockStatement(self, block):
         if block.parallel:
-            block_type = "parallel_block"
+            sexpr = ["parallel_block"]
+        elif block.subcircuit:
+            sexpr = ["subcircuit_block", block.iterations]
         else:
-            block_type = "sequential_block"
+            sexpr = ["sequential_block"]
 
-        sexpr = [block_type, *[self.visit(stmt) for stmt in block.statements]]
+        sexpr.extend(self.visit(stmt) for stmt in block.statements)
         return sexpr
 
     def visit_LoopStatement(self, loop):
