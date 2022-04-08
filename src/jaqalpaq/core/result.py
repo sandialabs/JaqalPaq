@@ -30,9 +30,34 @@ def parse_jaqal_output_list(circuit, output):
     """
     circuit = expand_macros(fill_in_let(circuit))
     visitor = DiscoverSubcircuits()
-    w = OutputParser(visitor.visit(circuit), output)
-    w.visit(circuit)
-    return ExecutionResult(w.subcircuits, w.res)
+    traces = visitor.visit(circuit)
+
+    subcircuits = [ReadoutSubcircuit(sc, n) for n, sc in enumerate(traces)]
+    res = []
+    readout_index = 0
+    data = iter(output)
+    breaks = [t.start for t in traces]
+
+    for readout_index, index in enumerate(walk_circuit(circuit, breaks)):
+        subcircuit = subcircuits[index]
+        try:
+            nxt = next(data)
+        except StopIteration:
+            raise JaqalError("Unable to parse output: too few values")
+        if isinstance(nxt, str):
+            nxt = int(nxt[::-1], 2)
+        mr = Readout(nxt, readout_index)
+        subcircuit.accept_readout(mr)
+        res.append(mr)
+
+    try:
+        next(data)
+    except StopIteration:
+        pass
+    else:
+        raise JaqalError("Unable to parse output: too many values")
+
+    return ExecutionResult(subcircuits, res)
 
 
 class ExecutionResult:
@@ -312,36 +337,6 @@ class ProbabilisticSubcircuit(Subcircuit):
         Use simulated_probability_by_str or relative_frequency_by_str.
         """
         return self.simulated_probability_by_str
-
-
-class OutputParser(TraceVisitor):
-    """(internal) Walks through execution ouput, sorting into :class:`Subcircuit`s"""
-
-    def __init__(self, traces, output):
-        """(internal) Prepares an OutputParser instance.
-
-        :param list[Trace] traces: the prepare_all/measure_all subcircuits
-        :param output: the measurement results
-        :type output: list[Str or Int]
-
-        """
-        super().__init__(traces)
-        self.data = iter(output)
-        self.subcircuits = []
-        self.res = []
-        self.readout_index = 0
-        for n, sc in enumerate(self.traces):
-            self.subcircuits.append(ReadoutSubcircuit(sc, n))
-
-    def process_trace(self):
-        subcircuit = self.subcircuits[self.index]
-        nxt = next(self.data)
-        if isinstance(nxt, str):
-            nxt = int(nxt[::-1], 2)
-        mr = Readout(nxt, self.readout_index)
-        subcircuit.accept_readout(mr)
-        self.res.append(mr)
-        self.readout_index += 1
 
 
 __all__ = [

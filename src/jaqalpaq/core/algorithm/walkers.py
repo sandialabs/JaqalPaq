@@ -6,6 +6,7 @@ from itertools import chain
 
 from .used_qubit_visitor import UsedQubitIndicesVisitor
 from .visitor import Visitor
+from jaqalpaq.core.locus import Locus
 from jaqalpaq.error import JaqalError
 from jaqalpaq.core.block import BlockStatement, LoopStatement
 
@@ -155,25 +156,36 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         self.current = None
 
 
-class TraceVisitor(Visitor):
-    """Call process_trace at the start of every trace in execution order."""
+class CircuitWalker(Visitor):
+    """(internal) Walk a circuit in execution order, yielding at each breakpoint.
 
-    def __init__(self, traces):
-        self.traces = traces
+    This requires the breakpoints to be given in the order they are
+    found by DiscoverSubcircuits.
+    """
+
+    def __init__(self, breakpoints):
+        self.breakpoints = breakpoints
         self.address = []
         self.index = 0
 
-    def process_trace(self):
-        raise NotImplementedError()
-
     def visit_Circuit(self, circuit):
-        if len(self.traces) == 0:
+        if len(self.breakpoints) == 0:
             return
-        self.objective = self.traces[self.index].start
+        if isinstance(self.breakpoints[0], Locus):
+            self.objective = list(self.breakpoints[self.index].address)
+        else:
+            # deprecated
+            self.objective = self.breakpoints[self.index]
 
-        return self.visit(circuit.body)
+        yield from self.visit(circuit.body)
 
     def visit_BlockStatement(self, block):
+        if block.subcircuit:
+            yield from self.do_loop(self.iterations, block)
+        else:
+            yield from self.do_block(block)
+
+    def do_block(self, block):
         first = True
         address = self.address
         while self.objective:
@@ -187,32 +199,39 @@ class TraceVisitor(Visitor):
             n = self.objective[len(address)]
             nxt = block.statements[n]
             if (len(address) + 1) == len(self.objective):
-                self.process_trace()
+                yield self.index
                 self.index += 1
-                if self.index == len(self.traces):
+                if self.index == len(self.breakpoints):
                     # We've found all the traces.  We're done!
                     self.objective = None
                     return
                 else:
-                    self.objective = self.traces[self.index].start
+                    if isinstance(self.breakpoints[0], Locus):
+                        self.objective = list(self.breakpoints[self.index].address)
+                    else:
+                        # deprecated
+                        self.objective = self.breakpoints[self.index]
             else:
                 address.append(n)
-                self.visit(nxt)
+                yield from self.visit(nxt)
                 address.pop()
 
     def visit_LoopStatement(self, loop):
+        yield from self.do_loop(loop.iterations, loop.statements)
+
+    def do_loop(self, iterations, block):
         # store the walk status
         index = self.index
         address = self.address[:]
         objective = self.objective
 
         # loop over the classical parts
-        for n in range(loop.iterations):
+        for n in range(iterations):
             # Restore the walk status at the start of every loop
             self.objective = objective
             self.address[:] = address[:]
             self.index = index
-            self.visit(loop.statements)
+            yield from self.visit(block)
 
     def visit_CaseStatement(self, case):
         # store the walk status
@@ -225,7 +244,16 @@ class TraceVisitor(Visitor):
         self.objective = objective
         self.address[:] = address[:] + case.state
         self.index = index
-        self.visit(case.statements)
+        yield from self.visit(case.statements)
 
     def visit_BranchStatement(self, branch):
         raise JaqalError("Tracing a circuit with a branch not supported")
+
+
+def walk_circuit(circuit, breakpoints):
+    """Walk a circuit in execution order, yielding at each breakpoint.
+
+    This requires the breakpoints to be given in the order they are
+    found by DiscoverSubcircuits.
+    """
+    yield from CircuitWalker(breakpoints).visit(circuit)

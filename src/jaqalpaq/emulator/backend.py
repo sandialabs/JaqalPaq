@@ -5,9 +5,11 @@ import abc
 
 from numpy.random import choice
 
+from jaqalpaq.core.locus import Locus
+from jaqalpaq.core.block import BlockStatement
 from jaqalpaq.core.result import ExecutionResult, Readout
 from jaqalpaq.core.result import ProbabilisticSubcircuit
-from jaqalpaq.core.algorithm.walkers import TraceVisitor
+from jaqalpaq.core.algorithm.walkers import walk_circuit
 
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend, AbstractBackend
 
@@ -109,33 +111,6 @@ class ExtensibleBackend(AbstractBackend):
         return gate_models
 
 
-class ReadoutGeneratingWalker(TraceVisitor):
-    def __init__(self, traces, subcircuits):
-        """(internal) Instantiates an EmulationWalker.
-
-        Produce emulated output sampled from a given probability distribution.
-
-        :param List[Trace] traces: the prepare_all/measure_all subcircuits
-        :param List[List[Float]] probabilities: the probabilities of each outcome
-
-        """
-        super().__init__(traces)
-        self.results = []
-        self.readout_index = 0
-        self.subcircuits = subcircuits
-        # This is only valid because we must always do measure_all.
-        if self.traces:
-            self.qubits = len(self.traces[0].used_qubits)
-
-    def process_trace(self):
-        subcircuit = self.subcircuits[self.index]
-        nxt = choice(2**self.qubits, p=subcircuit.probability_by_int)
-        mr = Readout(nxt, self.readout_index)
-        subcircuit.accept_readout(mr)
-        self.results.append(mr)
-        self.readout_index += 1
-
-
 class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     """Abstract emulator backend for subcircuits that are independent"""
 
@@ -143,12 +118,35 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     def _make_subcircuit(job, index, trace, circ):
         """(internal) Produce a subcircuit given a trace"""
 
+    def _make_readout(self, subcircuit, qubits, readout_index, results):
+        nxt = choice(2**qubits, p=subcircuit.probability_by_int)
+        mr = Readout(nxt, readout_index)
+        subcircuit.accept_readout(mr)
+        results.append(mr)
+
     def _execute_job(self, job):
         """(internal) Execute the job on the backend"""
         subcircs = [
             self._make_subcircuit(job, *tr, job.expanded_circuit)
             for tr in enumerate(job.traces)
         ]
-        w = ReadoutGeneratingWalker(job.traces, subcircs)
-        w.visit(job.expanded_circuit)
-        return ExecutionResult(subcircs, w.results)
+        results = []
+        qubits = self.get_n_qubits(job.circuit)
+
+        for readout_index, index in enumerate(
+            walk_circuit(job.expanded_circuit, [t.start for t in job.traces])
+        ):
+            # The subcircuit directive is not handled separately from the block
+            # that it contains, so we handle it manually here.
+            start = Locus.from_address(
+                job.expanded_circuit, job.traces[index].start
+            ).object
+            if isinstance(start, BlockStatement):
+                assert start.subcircuit
+                iterations = start.iterations
+            else:
+                iterations = 1
+            for _ in range(iterations):
+                self._make_readout(subcircs[index], qubits, readout_index, results)
+
+        return ExecutionResult(subcircs, results)
