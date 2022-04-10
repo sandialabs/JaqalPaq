@@ -109,11 +109,18 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         count = len(self.subcircuits)
         had_started = self.current is not None
 
+        if block.subcircuit:
+            self.start_trace(context=context)
+
         # XXX: using a trace restriction here is untested
         for n, stmt in self.trace_statements(block.statements):
             self.merge_into(
                 indices, self.visit(stmt, context=context), disjoint=block.parallel
             )
+
+        if block.subcircuit:
+            self.end_trace(context=context)
+            self.subcircuits[-1].end.append(self._last_index)
 
         if had_started and (reps > 1) and (len(self.subcircuits) != count):
             raise JaqalError("measure_all -> prepare_all not supported in loops")
