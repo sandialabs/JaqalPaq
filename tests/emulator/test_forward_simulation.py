@@ -300,8 +300,6 @@ loop 2 {
 
 prepare_all
 Px q[2]
-prepare_all
-Px q[2]
 measure_all
 """
         results = jaqalpaq.emulator.run_jaqal_string(jaqal_str)

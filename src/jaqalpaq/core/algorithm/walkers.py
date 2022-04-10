@@ -119,23 +119,30 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
 
     def visit_GateStatement(self, gate, context=None):
         if gate.name == self.p_gate:
-            # We allow for multiple prepare_all's in a row. But gates between those
-            # prepare_all's do nothing. Notice also, we would not yet know what the
-            # measured or used qubits are, if we had partial measurements.  That would
-            # have to wait until the measurement.
-            c = self.current = Trace(self.address[:])
+            self.start_trace(context=context)
         elif gate.name == self.m_gate:
-            if self.current is None:
-                raise JaqalError(f"{self.p_gate} must follow a {self.m_gate}")
-            self.current.end = self.address[:]
-            self.current.used_qubits = self.qubits
-            self.subcircuits.append(self.current)
-            self.current = None
+            self.end_trace(context=context)
         else:
             if self.current is None:
                 raise JaqalError(f"gates must follow a {self.p_gate}")
 
         return super().visit_GateStatement(gate, context=context)
+
+    def start_trace(self, context=None):
+        # We do not allow for multiple prepare_all's in a row.  Notice also, if we
+        # were doing mid-circuit measurements, that we would not know what the measured
+        # or used qubits are until until the measurement.
+        if self.current is not None:
+            raise JaqalError("Nested subcircuit are not allowed")
+        c = self.current = Trace(self.address[:])
+
+    def end_trace(self, context=None):
+        if self.current is None:
+            raise JaqalError(f"{self.p_gate} must follow a {self.m_gate}")
+        self.current.end = self.address[:]
+        self.current.used_qubits = self.qubits
+        self.subcircuits.append(self.current)
+        self.current = None
 
 
 class TraceVisitor(Visitor):
