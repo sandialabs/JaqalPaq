@@ -29,6 +29,7 @@ class Visitor:
         super().__init__(*args, **kwargs)
 
     def trace_statements(self, statements):
+        self._last_index = None
         address = self.address
         if self.started:
             n = 0
@@ -59,7 +60,7 @@ class Visitor:
             n = address[-1] = n + 1
             if self.trace and (address > self.trace.end):
                 break
-        address.pop()
+        self._last_index = address.pop()
 
     def visit_default(self, obj, *args, **kwargs):
         """Method called when no method matches. Override to provide default behavior.
