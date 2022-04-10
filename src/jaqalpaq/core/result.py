@@ -129,14 +129,9 @@ class RelativeFrequencySubcircuit(Subcircuit):
     """
 
     def __init__(self, *args, relative_frequencies=None, **kwargs):
-        # Don't require numpy in the experiment
-        import numpy
-
         super().__init__(*args, **kwargs)
-        if relative_frequencies is None:
-            self._relative_frequencies = numpy.zeros(2 ** len(self.measured_qubits))
-        else:
-            self._relative_frequencies = relative_frequencies
+        if relative_frequencies is not None:
+            self._relative_frequencies = validate_probabilities(relative_frequencies)
 
     @property
     def relative_frequency_by_int(self):
@@ -185,16 +180,45 @@ class ReadoutSubcircuit(RelativeFrequencySubcircuit):
     """
 
     def __init__(self, trace, index, **kwargs):
+        # Don't require numpy in the experiment
+        import numpy
+
         assert "relative_frequencies" not in kwargs
         assert "readouts" not in kwargs
 
         self._readouts = []
         super().__init__(trace, index, relative_frequencies=None, **kwargs)
+        self._counts = numpy.zeros(2 ** len(self.measured_qubits))
+
+    def _recalculate_counts(self):
+        try:
+            del self._relative_frequencies
+        except AttributeError:
+            pass
+
+        counts = self._counts
+        counts[:] = 0
+        for ro in self.readouts:
+            counts[ro.as_int] += 1
 
     def accept_readout(self, readout):
+        try:
+            del self._relative_frequencies
+        except AttributeError:
+            pass
+
         readout._subcircuit = self
         self._readouts.append(readout)
-        self._relative_frequencies[readout.as_int] += 1
+        self._counts[readout.as_int] += 1
+
+    @property
+    def relative_frequency_by_int(self):
+        try:
+            return self._relative_frequencies
+        except AttributeError:
+            counts = self._counts
+            rf = self._relative_frequencies = counts / counts.sum()
+            return rf
 
     @property
     def readouts(self):
