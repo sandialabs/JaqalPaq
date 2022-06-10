@@ -5,7 +5,7 @@ from .parameter import Parameter, ParamType
 from .gatedef import IdleGateDefinition
 
 
-def stretched_gates(gates, *, suffix=None, update=False):
+def stretched_gates(gates, *, suffix=None, update=False, origin=None):
     """Generate stretched GateDefinitions from parent GateDefinitions
 
     :param gates: A dictionary of GateDefinition objects representing the gates
@@ -13,6 +13,8 @@ def stretched_gates(gates, *, suffix=None, update=False):
     :param suffix str: (optional) A suffix to append to the names of the gates.
     :param update: (default False) If True, return gates after updating with the new
       stretched gates.
+    :param origin: Assign an originating Jaqal module for the gate definitions
+    :type origin: str
 
     :return dict: The stretched gates, with keys being the gate names.
 
@@ -50,6 +52,9 @@ def stretched_gates(gates, *, suffix=None, update=False):
         new_gate = gate.copy(
             name=new_name, parameters=parameters, ideal_unitary=ideal_unitary
         )
+
+        if origin is not None:
+            new_gate.origin = origin
 
         new_gates[new_name] = new_gate
         if add_idle:
