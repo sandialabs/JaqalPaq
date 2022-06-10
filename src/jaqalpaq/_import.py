@@ -67,7 +67,11 @@ def _jaqal_import_module_relative(mod_name, import_path):
 
 
 def jaqal_import(
-    mod_name, obj_name, import_path, reload_module="relative_only", full_reload=True
+    mod_name,
+    obj_name,
+    import_path=None,
+    reload_module="relative_only",
+    full_reload=True,
 ):
     assert reload_module in (True, False, "relative_only")
 
