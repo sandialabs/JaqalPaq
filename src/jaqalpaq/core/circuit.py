@@ -104,12 +104,16 @@ class Circuit:
         return [r for r in self.registers.values() if r.fundamental]
 
 
-def normalize_native_gates(native_gates):
+def normalize_native_gates(native_gates, origin=False):
     """Takes in the different ways that native gates can be represented and
     returns a dictionary.
 
     :param native_gates: A list or dict of gates, or None.
     :type native_gates: Optional[dict] or Optional[list]
+    :param origin: Assign an originating Jaqal module for the gate definitions.
+       If unset (or False), do not change the existing origin.
+    :type origin: str or None (optional)
+
     """
     native_gates = native_gates or {}
     if not isinstance(native_gates, dict):
@@ -119,4 +123,7 @@ def normalize_native_gates(native_gates):
         raise JaqalError("Native gate dictionary key did not match its name")
     if any(not isinstance(gate, GateDefinition) for gate in native_gates.values()):
         raise JaqalError("Native gates must be GateDefinition instances")
+    if origin is not False:
+        for gate in native_gates.values():
+            gate.origin = origin
     return native_gates
