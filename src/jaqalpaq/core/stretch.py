@@ -43,16 +43,9 @@ def stretched_gates(gates, *, suffix=None, update=False, origin=None):
         parameters = gate.parameters.copy()
         parameters.append(Parameter("stretch", ParamType.FLOAT))
 
-        if gate.ideal_unitary:
-            # Drop the last argument, which is the stretch factor
-            ideal_unitary = lambda *args: gate.ideal_unitary(args[:-1])
-        else:
-            ideal_unitary = None
-
         new_gate = gate.copy(
             name=new_name,
             parameters=parameters,
-            ideal_unitary=ideal_unitary,
             origin=origin,
         )
 

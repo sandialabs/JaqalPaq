@@ -16,19 +16,15 @@ class AbstractGate:
     :param str name: The name of the gate.
     :param parameters: What arguments (numbers, qubits, etc) the gate should be called
         with. If None, the gate takes no parameters.
-    :param function ideal_unitary: A function mapping a list of all classical arguments to
-        a numpy 2D array representation of the gate's ideal action in the computational
-        basis.
     :type parameters: list(Parameter) or None
     """
 
-    def __init__(self, name, parameters=None, ideal_unitary=None):
+    def __init__(self, name, parameters=None):
         self._name = name
         if parameters is None:
             self._parameters = []
         else:
             self._parameters = parameters
-        self._ideal_unitary = ideal_unitary
 
     def __repr__(self):
         return f"{type(self).__name__}({self.name}, {self.parameters})"
@@ -104,7 +100,7 @@ class AbstractGate:
     def __call__(self, *args, **kwargs):
         return self.call(*args, **kwargs)
 
-    def copy(self, *, name=None, parameters=None, ideal_unitary=None, origin=False):
+    def copy(self, *, name=None, parameters=None, origin=False):
         """Returns a shallow copy of the gate or gate definition.
 
         :param name: (optional) change the name in the copy.
@@ -118,8 +114,6 @@ class AbstractGate:
             copy._name = name
         if parameters is not None:
             copy._parameters = parameters
-        if ideal_unitary is not None:
-            copy._ideal_unitary = ideal_unitary
         if origin is not False:
             copy._origin = origin
 
@@ -136,11 +130,6 @@ class GateDefinition(AbstractGate):
     def __init__(self, *args, origin=None, **kwargs):
         super().__init__(*args, **kwargs)
         self._origin = origin
-
-    @property
-    def ideal_unitary(self):
-        """The ideal unitary action of the gate on its target qubits"""
-        return self._ideal_unitary
 
     @property
     def origin(self):
@@ -195,9 +184,6 @@ class IdleGateDefinition(GateDefinition):
 
     Represents a gate that merely idles for some duration.
     """
-
-    # Idle gates are a scheduling mechanism.  Formally, they act on no qubits.
-    _ideal_unitary = None
 
     def __init__(self, gate, name=None):
         # Special case handling of prepare and measure gates
