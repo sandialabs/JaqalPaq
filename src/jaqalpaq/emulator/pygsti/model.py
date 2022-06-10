@@ -15,6 +15,7 @@ from pygsti.processors import QubitProcessorSpec
 from pygsti.baseobjs import UnitaryGateFunction
 
 from jaqalpaq.error import JaqalError
+from .._import import get_ideal_action
 
 
 def pygsti_gate_name(gate):
@@ -111,24 +112,37 @@ def pygsti_independent_noisy_gate(gate, fun):
     return StaticArbitraryOp(fun(*[None for i in range(quantum_args)]))
 
 
-def pygsti_ideal_unitary(gate):
+def pygsti_ideal_unitary(gate, evotype):
     """Ideal unitary action of the gate with pyGSTi special casing.
 
     :param gate: The Jaqalpaq gate definition object describing the gate.
     """
+    ideal_unitary = get_ideal_action(gate)
 
-    def _unitary_fun(*parms):
+    # Skip gates without defined action
+    if ideal_unitary is None:
+        return
+
+    if len(gate.quantum_parameters) == 0:
+        raise JaqalError(f"{gate.name} not supported")
+
+    # Cast to a PyGSTi StaticUnitaryOp to avoid autoconstruction logic
+    if len(gate.classical_parameters) == 0:
+        return StaticUnitaryOp(ideal_unitary(), evotype=evotype)
+
+    def _gate(*parms):
         """
         :param parms: A list of all classical arguments to the gate.
         :return: The ideal unitary action of the gate on its target qubits, or an
         identity gate on the target qubit.
         """
         if parms:
-            return gate.ideal_unitary(*parms)
+            return ideal_unitary(*parms)
         else:
             return np.identity(2 ** len(gate.quantum_parameters), "complex")
 
-    return _unitary_fun
+    # Cast to a JaqalOpFactory to avoid autoconstruction logic
+    return JaqalOpFactory(_gate, gate=gate, pass_args=("classical",), evotype=evotype)
 
 
 def build_processor_spec(n_qubits, gates, evotype="default"):
@@ -143,24 +157,11 @@ def build_processor_spec(n_qubits, gates, evotype="default"):
     dummy_unitaries = {}
     availability = {}
     for g in gates.values():
+        obj = pygsti_ideal_unitary(g, evotype)
+
         # Skip gates without defined action
-        if g.ideal_unitary is None:
+        if obj is None:
             continue
-
-        if len(g.quantum_parameters) == 0:
-            raise JaqalError(f"{g.name} not supported")
-
-        if len(g.classical_parameters) > 0:
-            obj = pygsti_ideal_unitary(g)
-        else:
-            obj = g.ideal_unitary()
-
-        # Cast to either a PyGSTi StaticUnitaryOp or OpFactory to avoid autoconstruction logic
-        if callable(obj):
-            # For the ideal unitary, only pass classical arguments to underlying function
-            obj = JaqalOpFactory(obj, gate=g, pass_args=("classical",), evotype=evotype)
-        else:
-            obj = StaticUnitaryOp(obj, evotype=evotype)
 
         pygsti_name = pygsti_gate_name(g)
         unitaries[pygsti_name] = obj

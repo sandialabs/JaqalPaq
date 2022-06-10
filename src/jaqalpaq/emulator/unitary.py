@@ -6,6 +6,7 @@ import numpy
 from jaqalpaq.core.algorithm.walkers import TraceSerializer
 from jaqalpaq.core.result import ProbabilisticSubcircuit, ReadoutSubcircuit
 from jaqalpaq.emulator.backend import EmulatedIndependentSubcircuitsBackend
+from ._import import get_ideal_action
 
 
 class EmulatorSubcircuit(ProbabilisticSubcircuit, ReadoutSubcircuit):
@@ -61,7 +62,8 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
             # This capture the quantum arguments to the gate --- the qubit index
             qind = []
             gatedef = gatedefs[gate.name]
-            if gatedef.ideal_unitary is None:
+            ideal_unitary = get_ideal_action(gatedef)
+            if ideal_unitary is None:
                 # maybe add other checks?
                 continue
 
@@ -72,7 +74,7 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
                     qind.append(val.alias_index)
 
             # This is the dense submatrix
-            dsub = gatedef.ideal_unitary(*argv)
+            dsub = ideal_unitary(*argv)
 
             # now we need to sparse-multiply:
             # vec = U * imp
