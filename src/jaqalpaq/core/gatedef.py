@@ -195,6 +195,7 @@ class IdleGateDefinition(GateDefinition):
         self._parent_def = gate
         self._parameters = gate._parameters
         self._name = name if name else f"I_{gate.name}"
+        self.origin = gate.origin
 
     @property
     def used_qubits(self):
