@@ -411,7 +411,7 @@ class RebuildMacroInContextVisitor(Visitor):
     def visit_Macro(self, macro):
         changed, new_body = self.visit(macro.body)
         if changed:
-            return changed, Macro(macro.name, macro.parameters, new_body)
+            return changed, macro.copy(body=new_body)
         else:
             return changed, macro
 

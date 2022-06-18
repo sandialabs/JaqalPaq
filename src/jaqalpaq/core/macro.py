@@ -41,3 +41,17 @@ class Macro(AbstractGate):
         A :class:`BlockStatement` that implements the macro.
         """
         return self._body
+
+    def copy(self, *, body=None, **kwargs):
+        """Returns a shallow copy of the gate or gate definition.
+
+        :param name: (optional) change the name in the copy.
+        :param parameters: (optional) change the parameters in the copy.
+        :param body: (optional) change the body of the macro in the copy
+        """
+        copy = super().copy(**kwargs)
+
+        if body is not None:
+            copy._body = body
+
+        return copy
