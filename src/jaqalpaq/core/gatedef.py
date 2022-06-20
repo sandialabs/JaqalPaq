@@ -212,6 +212,10 @@ class IdleGateDefinition(GateDefinition):
         """
         yield from ()
 
+    def __call__(self, *args, **kwargs):
+        params = self._parent_def.parse_parameters(*args, **kwargs)
+        return GateStatement(self, params)
+
 
 class BusyGateDefinition(GateDefinition):
     """
