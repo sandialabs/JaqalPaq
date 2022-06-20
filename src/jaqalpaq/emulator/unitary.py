@@ -3,6 +3,7 @@
 # certain rights in this software.
 import numpy
 
+from jaqalpaq.error import JaqalError
 from jaqalpaq.core.algorithm.walkers import TraceSerializer
 from jaqalpaq.core.result import ProbabilisticSubcircuit, ReadoutSubcircuit
 from jaqalpaq.emulator.backend import EmulatedIndependentSubcircuitsBackend
@@ -56,15 +57,33 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
         # We serialize the subcircuit, obtaining a list of gates.
         # The plan is to apply the associated unitary to vec for each gate.
         s = TraceSerializer(trace)
+
+        first = True
+        must_be_last = False
+
         for gate in s.visit(circ):
+            if must_be_last:
+                raise JaqalError("Invalid gate in subcircuit")
+
             # This captures the classical arguments to the gate
             argv = []
             # This capture the quantum arguments to the gate --- the qubit index
             qind = []
             gatedef = gatedefs[gate.name]
-            ideal_unitary = get_ideal_action(gatedef)
-            if ideal_unitary is None:
+
+            try:
+                ideal_unitary = get_ideal_action(gatedef)
+            except KeyError:
+                if first:
+                    first = False
+                    continue
+                must_be_last = True
                 # maybe add other checks?
+                continue
+            first = False
+
+            if ideal_unitary is None:
+                # This includes things like idle gates
                 continue
 
             for param, val in zip(gatedef.parameters, gate.parameters.values()):
