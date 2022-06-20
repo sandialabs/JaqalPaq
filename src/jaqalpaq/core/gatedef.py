@@ -240,13 +240,7 @@ def add_idle_gates(active_gates):
     gates = {}
     for n, g in active_gates.items():
         gates[n] = g
-
-        try:
-            g = IdleGateDefinition(g)
-        except JaqalError:
-            # Ignore gates that do not have corresponding idle gates
-            pass
-        else:
-            gates[g.name] = g
+        idle_gate = IdleGateDefinition(g)
+        gates[idle_gate.name] = idle_gate
 
     return gates
