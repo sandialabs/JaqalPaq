@@ -6,6 +6,8 @@ from collections import OrderedDict
 from jaqalpaq.error import JaqalError
 from .gate import GateStatement
 
+import warnings
+
 
 class AbstractGate:
     """
@@ -47,7 +49,7 @@ class AbstractGate:
         """
         return self._parameters
 
-    def call(self, *args, **kwargs):
+    def parse_parameters(self, *args, **kwargs):
         """
         Create a :class:`GateStatement` that calls this gate.
         The arguments to this method will be the arguments the gate is called with.
@@ -95,10 +97,16 @@ class AbstractGate:
             )
         for param in self.parameters:
             param.validate(params[param.name])
-        return GateStatement(self, params)
+        return params
+
+    def call(self, *args, **kwargs):
+        """(deprecated) use gatedef(*args) instead"""
+        warnings.warn("Use gatedef() instead of gatedef.call()", DeprecationWarning)
+        return self(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
-        return self.call(*args, **kwargs)
+        params = self.parse_parameters(*args, **kwargs)
+        return GateStatement(self, params)
 
     def copy(self, *, name=None, parameters=None, origin=False):
         """Returns a shallow copy of the gate or gate definition.
