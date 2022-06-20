@@ -127,7 +127,7 @@ class GateReplacer(Visitor):
         new_parameters = {
             name: self.visit(param) for name, param in gate.parameters.items()
         }
-        new_gate = GateStatement(gate.gate_def, new_parameters)
+        new_gate = gate.gate_def(**new_parameters)
         return replace_gate(new_gate, self.macros)
 
     def visit_Parameter(self, param: Parameter):

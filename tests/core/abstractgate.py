@@ -37,7 +37,7 @@ class AbstractGateTesterBase:
         gate = gatedef()
         self.assertEqual({}, gate.parameters)
         self.assertEqual(gatedef.name, gate.name)
-        gate = gatedef.call()
+        gate = gatedef()
         self.assertEqual({}, gate.parameters)
         self.assertEqual(gatedef.name, gate.name)
 
@@ -51,7 +51,7 @@ class AbstractGateTesterBase:
         }
         self.assertEqual(arg_dict, gate.parameters)
         self.assertEqual(gatedef.name, gate.name)
-        gate = gatedef.call(*arguments)
+        gate = gatedef(*arguments)
         self.assertEqual(arg_dict, gate.parameters)
         self.assertEqual(gatedef.name, gate.name)
 
@@ -63,7 +63,7 @@ class AbstractGateTesterBase:
         with self.assertRaises(Exception):
             gatedef(*arguments)
         with self.assertRaises(Exception):
-            gatedef.call(*arguments)
+            gatedef(*arguments)
 
     def test_fail_too_few_args(self):
         """Test creating a GateStatement from a GateDefinition with the wrong number of arguments."""
@@ -73,7 +73,7 @@ class AbstractGateTesterBase:
         with self.assertRaises(Exception):
             gatedef(*arguments)
         with self.assertRaises(Exception):
-            gatedef.call(*arguments)
+            gatedef(*arguments)
 
     def test_fail_wrong_arg_type(self):
         """Test creating a GateStatement with the wrong argument types."""
@@ -89,7 +89,7 @@ class AbstractGateTesterBase:
                 with self.assertRaises(Exception):
                     gatedef(*arguments)
                 with self.assertRaises(Exception):
-                    gatedef.call(*arguments)
+                    gatedef(*arguments)
 
     def test_instantiate_keyword_args(self):
         """Test instantiating a GateStatement using keyword arguments."""
@@ -101,7 +101,7 @@ class AbstractGateTesterBase:
         gate = gatedef(**kwargs)
         self.assertEqual(kwargs, gate.parameters)
         self.assertEqual(gatedef.name, gate.name)
-        gate = gatedef.call(**kwargs)
+        gate = gatedef(**kwargs)
         self.assertEqual(kwargs, gate.parameters)
         self.assertEqual(gatedef.name, gate.name)
 
@@ -129,7 +129,7 @@ class AbstractGateTesterBase:
         with self.assertRaises(Exception):
             gatedef(*args, **kwargs)
         with self.assertRaises(Exception):
-            gatedef.call(*args, **kwargs)
+            gatedef(*args, **kwargs)
 
     def test_fail_too_few_keyword_args(self):
         """Test failing when not providing enough keyword arguments."""
@@ -140,7 +140,7 @@ class AbstractGateTesterBase:
         with self.assertRaises(Exception):
             gatedef(**kwargs)
         with self.assertRaises(Exception):
-            gatedef.call(**kwargs)
+            gatedef(**kwargs)
 
     def test_fail_too_many_keyword_args(self):
         """Test failing when providing unnecessary keyword arguments."""
@@ -156,4 +156,4 @@ class AbstractGateTesterBase:
         with self.assertRaises(Exception):
             gatedef(**kwargs)
         with self.assertRaises(Exception):
-            gatedef.call(**kwargs)
+            gatedef(**kwargs)
