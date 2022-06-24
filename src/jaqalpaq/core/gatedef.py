@@ -108,7 +108,7 @@ class AbstractGate:
         params = self.parse_parameters(*args, **kwargs)
         return GateStatement(self, params)
 
-    def copy(self, *, name=None, parameters=None, origin=False):
+    def copy(self, *, name=None, parameters=None, origin=False, unitary=None):
         """Returns a shallow copy of the gate or gate definition.
 
         :param name: (optional) change the name in the copy.
@@ -124,6 +124,8 @@ class AbstractGate:
             copy._parameters = parameters
         if origin is not False:
             copy._origin = origin
+        if unitary is not None:
+            copy._unitary = unitary
 
         return copy
 
@@ -133,16 +135,23 @@ class GateDefinition(AbstractGate):
     Base: :class:`AbstractGate`
 
     Represents a gate that's implemented by a pulse sequence in a gate definition file.
+    :param bool unitary: Whether or not the gate represents a purely unitary action.
     """
 
-    def __init__(self, *args, origin=None, **kwargs):
+    def __init__(self, *args, origin=None, unitary=True, **kwargs):
         super().__init__(*args, **kwargs)
         self._origin = origin
+        self._unitary = unitary
 
     @property
     def origin(self):
         """The Jaqal module in which this gate is defined."""
         return self._origin
+
+    @property
+    def unitary(self):
+        """Whether or not the gate is (ideally) unitary."""
+        return self._unitary
 
     @property
     def used_qubits(self):
