@@ -29,13 +29,15 @@ class Visitor:
         super().__init__(*args, **kwargs)
 
     def trace_statements(self, statements):
-        self._last_index = None
         address = self.address
+        if self.trace:
+            end = self.trace.end
+            start = self.trace.start
+
         if self.started:
             n = 0
             address.append(n)
         else:
-            start = self.trace.start
             if start[: len(address)] != address:
                 assert start[: len(address)] > address
                 return
@@ -46,7 +48,7 @@ class Visitor:
 
         len_address = len(address)
 
-        if self.trace and (address > self.trace.end):
+        if self.trace and (address[: len(end)] > end):
             # This is the measure -> prepare case
             while n < len(statements):
                 yield n, statements[n]
@@ -58,9 +60,10 @@ class Visitor:
             yield n, statements[n]
             assert len(address) == len_address
             n = address[-1] = n + 1
-            if self.trace and (address > self.trace.end):
+            if self.trace and (address[: len(end)] > end):
                 break
-        self._last_index = address.pop()
+
+        address.pop()
 
     def visit_default(self, obj, *args, **kwargs):
         """Method called when no method matches. Override to provide default behavior.
