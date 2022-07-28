@@ -210,6 +210,7 @@ class IdleGateDefinition(GateDefinition):
             name=name if name else f"I_{gate.name}",
             parameters=gate._parameters,
             origin=gate.origin,
+            unitary=True,
         )
         self._parent_def = gate
 
