@@ -4,128 +4,77 @@
 import numpy
 
 from jaqalpaq.error import JaqalError
-from jaqalpaq.core.algorithm.walkers import TraceSerializer, Trace
 from jaqalpaq.run.cursor import SubcircuitCursor, State
+import jaqalpaq.run.result
 from jaqalpaq.run.result import Subcircuit, ReadoutTreeNode, validate_probabilities
 from jaqalpaq.emulator.backend import EmulatedIndependentSubcircuitsBackend
 from ._import import get_ideal_action
 
 
-def matrix_index_iter(gates, gatedefs, ideal_action):
-    first = True
-    must_be_last = False
-    for gate in gates:
-        if must_be_last:
-            raise JaqalError("Invalid gate in subcircuit")
-
-        # This captures the classical arguments to the gate
-        argv = []
-        # This capture the quantum arguments to the gate --- the qubit index
-        qind = []
-        gatedef = gatedefs[gate.name]
-        try:
-            ideal_unitary = ideal_action(gatedef)
-        except KeyError:
-            if first:
-                first = False
-                continue
-            must_be_last = True
-            # maybe add other checks?
-            continue
-        first = False
-
-        if ideal_unitary is None:
-            continue
-
-        for param, val in zip(gatedef.parameters, gate.parameters.values()):
-            if param.classical:
-                argv.append(val)
-            else:
-                qind.append(val.alias_index)
-
-        # This is the dense submatrix
-        dsub = ideal_unitary(*argv)
-        yield dsub, qind
-
-
-def inplace_multiply(matrix_indices, vec):
-    hilb_dim = len(vec)
-
-    # vec = U * inp
-    # We don't need to initialize inp yet
-    inp = numpy.empty(hilb_dim, dtype=complex)
-
+def inplace_multiply(dsub, qind, vec, scratch):
     # The plan is to apply the associated unitary to vec for each gate.
-    for dsub, qind in matrix_indices:
-        # now we need to sparse-multiply:
-        # vec = U * inp
-        # But! U isn't just dsub
+    # now we need to sparse-multiply:
+    # vec = U * inp
+    # But! U isn't just dsub
 
-        # The current state-vector becomes the input to the matrix multiplication
-        inp, vec = vec, inp
-        # (Notice that this initializes inp, from above)
-        vec[:] = 0
+    # The current state-vector becomes the input to the matrix multiplication
+    inp, vec = vec, scratch
+    # (Notice that this initializes inp, from above)
+    vec[:] = 0
 
-        # For every column in the output matrix, we need to compute the sum
-        # over the nonzero rows of U.
+    # For every column in the output matrix, we need to compute the sum
+    # over the nonzero rows of U.
 
-        # However, this corresponds to a sum only over rows of dsub, with
-        # a particular mapping between the rows and columns.
-        for i in range(hilb_dim):
-            # Because we are only dealing with qubits, the binary representation
-            # of the row is precisely the standard basis label corresponding to that
-            # row.
+    # However, this corresponds to a sum only over rows of dsub, with
+    # a particular mapping between the rows and columns.
+    for i in range(len(vec)):
+        # Because we are only dealing with qubits, the binary representation
+        # of the row is precisely the standard basis label corresponding to that
+        # row.
 
-            # We need to re-map the qubits that are being acted on by dsub to
-            # the *column* of dsub.  Additionally, the qubits that are not being
-            # acted on by dsub are unaffected, and therefore are the same in both
-            # the input and output.
+        # We need to re-map the qubits that are being acted on by dsub to
+        # the *column* of dsub.  Additionally, the qubits that are not being
+        # acted on by dsub are unaffected, and therefore are the same in both
+        # the input and output.
 
-            # mask is precisely these bystander qubits --- the affected qubits are
-            # set to zero, and shuffled into another variable, dsub_row
-            mask = i
+        # mask is precisely these bystander qubits --- the affected qubits are
+        # set to zero, and shuffled into another variable, dsub_row
+        mask = i
 
-            # We initialize dsub_row to zero, and then build it up via bit-twiddling
-            dsub_row = 0
+        # We initialize dsub_row to zero, and then build it up via bit-twiddling
+        dsub_row = 0
 
-            # Which bit (stored as a bitmask) is up to be changed?
-            dsub_bit = 1
-            for i_k in qind:
-                # We iterate over all the qubits acted on by dsub
+        for dsub_bit, i_k in enumerate(qind):
+            # We iterate over all the qubits acted on by dsub
 
-                # Is this specific qubit high (for this row)?
-                n_high = mask & (1 << i_k)
+            # Is this specific qubit high (for this row)?
+            n_high = mask & (0b1 << i_k)
 
-                # If it is high, lower it in the mask
-                # (notice this is equivalent to subtraction)
-                mask ^= n_high
+            # If it is high, lower it in the mask
+            # (notice this is equivalent to subtraction)
+            mask ^= n_high
 
-                # If it is high, raise it in the row to be passed to dsub
-                # (notice this is equivalent to addition)
-                if n_high:
-                    dsub_row |= dsub_bit
+            # If it is high, raise it in the row to be passed to dsub
+            # (notice this is equivalent to addition)
+            dsub_row |= (n_high >> i_k) << dsub_bit
 
-                # Advance the bit mask by one
-                dsub_bit <<= 1
+        # We now have the row in dsub that corresponds to the row in U
 
-            # We now have the row in dsub that corresponds to the row in U
+        # Next, we need to iterate over the column of U, and simultaneously the
+        # column of inp --- this mapping is the same as the above, backwards.
+        for dsub_col in range(dsub.shape[0]):
+            j = mask
+            dsub_col_stack = dsub_col
+            for dsub_bit, j_k in enumerate(qind):
+                j |= (dsub_col_stack & 0b1) << j_k
+                dsub_col_stack >>= 1
 
-            # Next, we need to iterate over the column of U, and simultaneously the
-            # column of inp --- this mapping is the same as the above, backwards.
-            for dsub_col in range(dsub.shape[0]):
-                j = mask
-                dsub_bit = 1
-                for j_k in qind:
-                    if dsub_col & dsub_bit:
-                        j |= 1 << j_k
-                    dsub_bit <<= 1
+            # Suitably armed with the associated row and column, we
+            # do the standard matrix accumulation sum step.
 
-                # Suitably armed with the associated row and column, we
-                # do the standard matrix accumulation sum step.
+            vec[i] += dsub[dsub_row, dsub_col] * inp[j]
 
-                vec[i] += inp[j] * dsub[dsub_row, dsub_col]
-
-    return vec
+    return vec, inp
 
 
 class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
@@ -146,40 +95,70 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
 
         circ = job.expanded_circuit
 
-        cursor = SubcircuitCursor.terminal_cursor(end)
-        trace = Trace(list(start.address), list(end.address))
+        gatedefs = circ.native_gates
+
+        # fill_in_let modified the circuit here
+        cursor = SubcircuitCursor(start, end)
 
         n_qubits = self.get_n_qubits(circ)
 
+        # We serialize the subcircuit, obtaining a list of gates.
+        # The plan is to apply the associated unitary to vec for each gate.
         hilb_dim = 2**n_qubits
-
-        # vec = U * inp
-        # We don't need to initialize inp yet
         vec = numpy.zeros(hilb_dim, dtype=complex)
         vec[0] = 1
 
-        # We serialize the subcircuit, obtaining a list of gates.
-        # The plan is to apply the associated unitary to vec for each gate.
-        s = TraceSerializer(trace)
+        def handle_final_measurement(cursor, vec):
+            subs = {}
+            P = numpy.abs(vec) ** 2
+            P = validate_probabilities(P)
+            for i, prob in enumerate(P):
+                if prob <= jaqalpaq.run.result.CUTOFF_ZERO:
+                    continue
+                meas_cursor = cursor.copy()
+                meas = meas_cursor.next_measure()
+                assert meas_cursor.state == State.shutdown
+                sub = ReadoutTreeNode(meas_cursor)
+                sub.simulated_probability = prob
+                subs[i] = sub
+            res = ReadoutTreeNode(cursor, subsequent=subs)
+            res.state_vector = vec
+            return res
 
-        vec = inplace_multiply(
-            matrix_index_iter(s.visit(circ), circ.native_gates, get_ideal_action),
-            vec,
-        )
+        def handle_unitary(cursor, vec):
+            # We don't need to initialize this yet.
+            scratch = numpy.empty(hilb_dim, dtype=complex)
 
-        probs = numpy.abs(vec) ** 2
+            while cursor.state == State.gate:
+                gate = cursor.next_gate()
+                cursor.report_gate_executed()
 
-        p = validate_probabilities(probs)
+                # This captures the classical arguments to the gate
+                argv = []
+                # This capture the quantum arguments to the gate --- the qubit index
+                qind = []
+                gatedef = gatedefs[gate.name]
+                ideal_unitary = get_ideal_action(gatedef)
+                if ideal_unitary is None:
+                    continue
 
-        tree = ReadoutTreeNode(cursor)
-        tree.simulated_statevector = vec
+                for param, val in zip(gatedef.parameters, gate.parameters.values()):
+                    if param.classical:
+                        argv.append(val)
+                    else:
+                        qind.append(val.alias_index)
 
-        for k, v in enumerate(p):
-            nxt_cursor = cursor.copy()
-            nxt_cursor.next_measure()
-            node = tree.subsequent[k] = ReadoutTreeNode(nxt_cursor)
-            node.simulated_probability = v
+                # This is the dense submatrix
+                dsub = ideal_unitary(*argv)
 
-        ret = Subcircuit(index, start, end, tree=tree)
+                vec, scratch = inplace_multiply(dsub, qind, vec, scratch)
+
+            if cursor.state == State.final_measurement:
+                return handle_final_measurement(cursor, vec)
+            else:
+                raise NotImplementedError()
+
+        tree = handle_unitary(cursor, vec)
+        ret = Subcircuit(index, start, end=end, tree=tree)
 
         return ret
