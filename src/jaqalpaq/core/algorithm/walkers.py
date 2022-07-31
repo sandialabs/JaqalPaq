@@ -12,7 +12,7 @@ from jaqalpaq.core.block import BlockStatement, LoopStatement
 
 
 class Trace:
-    """Describes a portion of a Circuit traced out by start and stop locations."""
+    """(deprecated) Describes a portion of a Circuit traced out by start and stop locations."""
 
     def __init__(self, start=None, end=None, used_qubits=None):
         if start is None:

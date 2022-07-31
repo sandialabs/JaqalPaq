@@ -31,8 +31,11 @@ class Visitor:
     def trace_statements(self, statements):
         address = self.address
         if self.trace:
-            end = self.trace.end
-            start = self.trace.start
+            try:
+                start, end = (list(p.address) for p in self.trace)
+            except TypeError:
+                # (deprecated)
+                start, end = self.trace.start, self.trace.end
 
         if self.started:
             n = 0
