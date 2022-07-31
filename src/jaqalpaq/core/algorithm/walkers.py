@@ -69,6 +69,7 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
     def __init__(self, *args, p_gate="prepare_all", m_gate="measure_all", **kwargs):
         super().__init__(*args, **kwargs)
         self.current = None
+        self.qubits = None
         self.subcircuits = []
         self.p_gate = p_gate
         self.m_gate = m_gate
@@ -78,6 +79,8 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         # prepare_all and measure_all.  In the future, we presumably will employ the used
         # qubit functionality of the superclass, and separately report the measured
         # qubits.  But we do not support partial measurements yet.
+        if self.qubits is not None:
+            raise RuntimeError("Cannot reuse DiscoverSubcircuit object")
         self.qubits = list(chain.from_iterable(circuit.fundamental_registers()))
         super().visit_Circuit(circuit, context=context)
 
@@ -144,14 +147,15 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         # or used qubits are until until the measurement.
         if self.current is not None:
             raise JaqalError("Nested subcircuit are not allowed")
-        c = self.current = Trace(self.address[:])
+        self.current = Trace(self.address[:])
 
     def end_trace(self, context=None):
         if self.current is None:
             raise JaqalError(f"{self.p_gate} must follow a {self.m_gate}")
-        self.current.end = self.address[:]
-        self.current.used_qubits = self.qubits
-        self.subcircuits.append(self.current)
+        current = self.current
+        current.end = self.address[:]
+        current.used_qubits = self.qubits
+        self.subcircuits.append(current)
         self.current = None
 
 
