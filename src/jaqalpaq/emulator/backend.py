@@ -118,35 +118,31 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     def _make_subcircuit(job, index, trace, circ):
         """(internal) Produce a subcircuit given a trace"""
 
-    def _make_readout(self, subcircuit, qubits, readout_index, results):
+    def _make_readout(self, subcircuit, qubits, results):
         nxt = choice(2**qubits, p=subcircuit.probability_by_int)
-        mr = Readout(nxt, readout_index)
+        mr = Readout(nxt, len(results))
         subcircuit.accept_readout(mr)
         results.append(mr)
 
     def _execute_job(self, job):
         """(internal) Execute the job on the backend"""
+        circ = job.expanded_circuit
         subcircs = [
-            self._make_subcircuit(job, *tr, job.expanded_circuit)
-            for tr in enumerate(job.traces)
+            self._make_subcircuit(job, *tr, circ) for tr in enumerate(job.traces)
         ]
         results = []
         qubits = self.get_n_qubits(job.circuit)
 
-        for readout_index, index in enumerate(
-            walk_circuit(job.expanded_circuit, [t.start for t in job.traces])
-        ):
+        for index in walk_circuit(circ, [t.start for t in job.traces]):
             # The subcircuit directive is not handled separately from the block
             # that it contains, so we handle it manually here.
-            start = Locus.from_address(
-                job.expanded_circuit, job.traces[index].start
-            ).object
+            start = Locus.from_address(circ, job.traces[index].start).object
             if isinstance(start, BlockStatement):
                 assert start.subcircuit
                 iterations = start.iterations
             else:
                 iterations = 1
             for _ in range(iterations):
-                self._make_readout(subcircs[index], qubits, readout_index, results)
+                self._make_readout(subcircs[index], qubits, results)
 
         return ExecutionResult(subcircs, results)
