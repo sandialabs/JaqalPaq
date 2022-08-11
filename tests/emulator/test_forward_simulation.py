@@ -136,8 +136,7 @@ measure_all
         self.assertAlmostEqual(output_probs["11111"], 0.5)
 
     def test_JaqalError(self):
-        with pytest.raises(jaqalpaq.error.JaqalError):
-            jaqal_str = """
+        jaqal_str = """
 from qscout.v1.std usepulses *
 register q[1]
 prepare_all
@@ -145,7 +144,8 @@ Px q[0]
 measure_all
 measure_all
 """
-            jaqal_circ = jaqalpaq.parser.parse_jaqal_string(jaqal_str)
+        jaqal_circ = jaqalpaq.parser.parse_jaqal_string(jaqal_str)
+        with pytest.raises(jaqalpaq.error.JaqalError):
             results = jaqalpaq.emulator.run_jaqal_circuit(jaqal_circ)
 
     def test_spec_bell_state(self):
