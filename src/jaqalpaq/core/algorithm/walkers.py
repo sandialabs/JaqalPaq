@@ -80,6 +80,9 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         self.qubits = list(chain.from_iterable(circuit.fundamental_registers()))
         super().visit_Circuit(circuit, context=context)
 
+        if self.current is not None:
+            raise JaqalError("Subcircuit did not end")
+
         subcircuits = self.subcircuits
         if len(subcircuits) == 0:
             return ()
