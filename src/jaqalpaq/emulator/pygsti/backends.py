@@ -93,6 +93,24 @@ class AbstractNoisyNativeEmulator(backend.ExtensibleBackend, CircuitEmulator):
       details.
     """
 
+    def __init__(
+        self, n_qubits, model=None, gate_durations=None, stretched_gates=None, **kwargs
+    ):
+        self.n_qubits = n_qubits
+        self.stretched_gates = stretched_gates
+        model, gate_durations = self.build_model()
+        super().__init__(model=model, gate_durations=gate_durations, **kwargs)
+
+    def get_n_qubits(self, circ):
+        """Returns the number of qubits the backend will be simulating.
+
+        :param circ: The circuit object being emulated/simulated.
+        """
+        circuit_qubits = super().get_n_qubits(circ)
+        if circuit_qubits > self.n_qubits:
+            raise ValueError(f"{self} emulates fewer qubits than {circ} uses")
+        return self.n_qubits
+
     def build_model(self):
         return build_noisy_native_model(
             self.jaqal_gates,

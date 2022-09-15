@@ -21,10 +21,9 @@ class ExtensibleBackend(AbstractBackend):
       gateduration_{name} method defined.
     """
 
-    def __init__(self, n_qubits, stretched_gates=None, **kwargs):
+    def __init__(self, *args, stretched_gates=None, **kwargs):
         """(abstract) Perform part of the construction of a noisy model.
 
-        :param n_qubits: The number of qubits to simulate
         :param stretched_gates: (default False)  Add stretched gates to the model:
           - If None, do not modify the gates.
           - If 'add', add gates with '_stretched' appended that take an extra parameter,
@@ -32,20 +31,8 @@ class ExtensibleBackend(AbstractBackend):
           - Otherwise, stretched_gates must be the numerical stretch factor that is
             applied to all gates (no extra stretched gates are added
         """
-        self.n_qubits = n_qubits
         self.stretched_gates = stretched_gates
-        model, durations = self.build_model()
-        super().__init__(model=model, gate_durations=durations, **kwargs)
-
-    def get_n_qubits(self, circ):
-        """Returns the number of qubits the backend will be simulating.
-
-        :param circ: The circuit object being emulated/simulated.
-        """
-        circuit_qubits = super().get_n_qubits(circ)
-        if circuit_qubits > self.n_qubits:
-            raise ValueError(f"{self} emulates fewer qubits than {circ} uses")
-        return self.n_qubits
+        super().__init__(*args, **kwargs)
 
     def set_defaults(self, kwargs, **defaults):
         """Set parameters from a list of defaults and function kwargs.
