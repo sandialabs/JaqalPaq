@@ -85,7 +85,7 @@ class ExtensibleBackend(AbstractBackend):
         """
         gate_models = {}
 
-        for gate_name in type(self).__dict__:
+        for gate_name in dir(type(self)):
             if not gate_name.startswith("gate_"):
                 continue
 
