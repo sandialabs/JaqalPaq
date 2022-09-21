@@ -1,5 +1,5 @@
+from pathlib import Path
 import unittest, pytest
-import os
 
 import jaqalpaq
 import jaqalpaq.error
@@ -23,7 +23,7 @@ from qscout.v1.std.noisy import SNLToy1
 
 
 def example(*args):
-    return os.path.join("examples", "jaqal", *args)
+    return Path("examples", "jaqal", *args)
 
 
 class ForwardSimulatorTester(unittest.TestCase):

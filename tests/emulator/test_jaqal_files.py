@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import unittest, pytest
 
 import numpy as np
@@ -18,15 +18,11 @@ qscout = pytest.importorskip("qscout")
 from qscout.v1.std.noisy import SNLToy1
 
 
-def example(*args):
-    return os.path.join("examples", "jaqal", *args)
-
-
-_fnames = [example(fn) for fn in os.listdir(example()) if fn[-6:] == ".jaqal"]
+_fnames = [fn for fn in Path("examples", "jaqal").iterdir() if fn.suffix == ".jaqal"]
 
 
 def pytest_generate_tests(metafunc):
-    metafunc.parametrize("filename", [fn for fn in _fnames])
+    metafunc.parametrize("filename", list(_fnames))
 
 
 class TestExecuteAnnotatedJaqalFile:
