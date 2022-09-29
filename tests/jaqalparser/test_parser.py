@@ -187,7 +187,7 @@ class ParserTester(unittest.TestCase):
 
     def test_branch_statement(self):
         """Test creating a branch statement."""
-        text = "branch { \n'0100': { g0 1 } \n '1010':{ g1 2} \n}"
+        text = "branch { \n'0010': { g0 1 } \n '0101':{ g1 2} \n}"
         sexpr = [
             "circuit",
             [
@@ -200,7 +200,7 @@ class ParserTester(unittest.TestCase):
 
     def test_branch_statement_no_newlines(self):
         """Test creating a branch statement without using newlines."""
-        text = "branch { '0100': { g0 1 }; '1010':{ g1 2}; }"
+        text = "branch { '0010': { g0 1 }; '0101':{ g1 2}; }"
         sexpr = [
             "circuit",
             [
@@ -213,7 +213,7 @@ class ParserTester(unittest.TestCase):
 
     def test_branch_statement_no_final_separator(self):
         """Test creating a branch with no separator after the final case."""
-        text = "branch { '0100': { g0 1 }; '1010':{ g1 2} }"
+        text = "branch { '0010': { g0 1 }; '0101':{ g1 2} }"
         sexpr = [
             "circuit",
             [

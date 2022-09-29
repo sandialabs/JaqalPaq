@@ -94,7 +94,7 @@ class JaqalLexer(Lexer):
         return token
 
     def BININT(self, token):
-        token.value = int(token.value[1:-1], base=2)
+        token.value = int(token.value[-2:0:-1], base=2)
         return token
 
 
@@ -198,6 +198,7 @@ class JaqalParser(Parser):
         "parallel_gate_block",
         "loop_statement",
         "subcircuit_gate_block",
+        "branch_statement",
     )
     def inner_seq_statement(self, tree):
         # No need to set self._in_body as we've definitely already set
