@@ -8,9 +8,9 @@ from numpy.random import choice
 from jaqalpaq.core.locus import Locus
 from jaqalpaq.core.block import BlockStatement
 from jaqalpaq.core.result import ExecutionResult, Readout
-from jaqalpaq.core.result import ProbabilisticSubcircuit
-from jaqalpaq.core.algorithm.walkers import walk_circuit
+from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
 
+from jaqalpaq.run import cursor
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend, AbstractBackend
 
 
@@ -102,34 +102,48 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     """Abstract emulator backend for subcircuits that are independent"""
 
     @abc.abstractmethod
-    def _make_subcircuit(job, index, trace, circ):
+    def _make_subcircuit(self, job, index, start, end):
         """(internal) Produce a subcircuit given a trace"""
 
-    def _make_readout(self, subcircuit, qubits, results):
-        nxt = choice(2**qubits, p=subcircuit.probability_by_int)
-        mr = Readout(nxt, len(results))
-        subcircuit.accept_readout(mr)
-        results.append(mr)
+    def _make_readouts(self, subcircuit, results):
+        def _make_all_readouts():
+            node = subcircuit._tree
+            while not node.classical_state.state == cursor.State.shutdown:
+                keys = list(node.subsequent.keys())
+                p = [node.subsequent[k].simulated_probability for k in keys]
+                nxt = choice(keys, p=p)
+                mr = Readout(nxt, len(results), node)
+                results.append(mr)
+                yield mr
+                node = node[nxt]
+
+        subcircuit.accept_readouts(_make_all_readouts())
 
     def _execute_job(self, job):
         """(internal) Execute the job on the backend"""
         circ = job.expanded_circuit
-        subcircs = [
-            self._make_subcircuit(job, *tr, circ) for tr in enumerate(job.traces)
-        ]
+        subcircs = []
+        for n, (start, end) in enumerate(discover_subcircuits(circ)):
+            subcirc = self._make_subcircuit(job, n, start, end)
+            subcirc._simulated = True
+            subcirc.reset_readouts()
+            subcircs.append(subcirc)
         results = []
-        qubits = self.get_n_qubits(job.circuit)
 
-        for index in walk_circuit(circ, [t.start for t in job.traces]):
+        for index in walk_circuit(circ, [t._start for t in subcircs]):
             # The subcircuit directive is not handled separately from the block
             # that it contains, so we handle it manually here.
-            start = Locus.from_address(circ, job.traces[index].start).object
-            if isinstance(start, BlockStatement):
-                assert start.subcircuit
-                iterations = start.iterations
+            subcirc = subcircs[index]
+            start_obj = subcirc._start.object
+            if isinstance(start_obj, BlockStatement):
+                assert start_obj.subcircuit
+                iterations = start_obj.iterations
             else:
                 iterations = 1
             for _ in range(iterations):
-                self._make_readout(subcircs[index], qubits, results)
+                self._make_readouts(subcirc, results)
+
+        for subcirc in subcircs:
+            subcirc.normalize_counts()
 
         return ExecutionResult(subcircs, results)

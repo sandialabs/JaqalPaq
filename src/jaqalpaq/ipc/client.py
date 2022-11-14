@@ -11,7 +11,8 @@ import socket, select
 import json
 
 from jaqalpaq.generator import generate_jaqal_program
-from jaqalpaq.core.result import ExecutionResult, RelativeFrequencySubcircuit
+from jaqalpaq.core.result import ExecutionResult, Subcircuit, ReadoutTreeNode
+from jaqalpaq.core.algorithm.walkers import discover_subcircuits
 from jaqalpaq.error import JaqalError
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend
 
@@ -93,15 +94,21 @@ class IPCBackend(IndependentSubcircuitsBackend):
         return results
 
     def _execute_job(self, job):
-        freqs = self._ipc_protocol(job.circuit)
-        n_qubits = self.get_n_qubits(job.circuit)
+        circ = job.expanded_circuit
+        freqs = self._ipc_protocol(circ)
+        n_qubits = self.get_n_qubits(circ)
         subcircs = []
-        for n, tr in enumerate(job.traces):
-            subcircs.append(
-                RelativeFrequencySubcircuit(
-                    tr, n, normalized_counts=[float(rf) for rf in freqs[n]]
-                )
-            )
+
+        for n, (start, end) in enumerate(discover_subcircuits(circ)):
+            subcirc = Subcircuit(n, start, end)
+            subcircs.append(subcirc)
+
+            for k, nc in enumerate(freqs[n]):
+                try:
+                    nxt_node = subcirc._tree[k]
+                except KeyError:
+                    nxt_node = subcirc._tree._spawn(k)
+                nxt_node.normalized_count = nc
 
         if n + 1 < len(freqs):
             raise JaqalError("Unable to parse output: too many values")

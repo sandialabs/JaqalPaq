@@ -4,27 +4,11 @@
 import numpy
 
 from jaqalpaq.error import JaqalError
-from jaqalpaq.core.algorithm.walkers import TraceSerializer
-from jaqalpaq.core.result import ProbabilisticSubcircuit, ReadoutSubcircuit
+from jaqalpaq.core.algorithm.walkers import TraceSerializer, Trace
+from jaqalpaq.run.cursor import SubcircuitCursor, State
+from jaqalpaq.core.result import Subcircuit, ReadoutTreeNode, validate_probabilities
 from jaqalpaq.emulator.backend import EmulatedIndependentSubcircuitsBackend
 from ._import import get_ideal_action
-
-
-class EmulatorSubcircuit(ProbabilisticSubcircuit, ReadoutSubcircuit):
-    """Encapsulate one part of the circuit between a prepare_all and measure_all gate.
-
-    This tracks the output of a unitary, forward-map simulation run, which provides access
-    to emulated measurement outcomes, their relative frequency, the *ideal* measurement
-    probabilities, and the ideal state vector before measurement.
-    """
-
-    def __init__(self, *args, state_vector, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._state_vector = state_vector
-
-    @property
-    def state_vector(self):
-        return self._state_vector
 
 
 class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
@@ -33,7 +17,7 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
     This object should be treated as an opaque symbol to be passed to run_jaqal_circuit.
     """
 
-    def _make_subcircuit(self, job, index, trace, circ):
+    def _make_subcircuit(self, job, index, start, end):
         """Generate the ProbabilisticSubcircuit associated with the trace of circuit
             being process in job.
 
@@ -42,6 +26,11 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
         :param Trace trace: the trace of the subcircuit
         :return: A ProbabilisticSubcircuit.
         """
+
+        circ = job.expanded_circuit
+
+        cursor = SubcircuitCursor.terminal_cursor(end)
+        trace = Trace(list(start.address), list(end.address))
 
         n_qubits = self.get_n_qubits(circ)
 
@@ -165,8 +154,17 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
 
         probs = numpy.abs(vec) ** 2
 
-        subcircuit = EmulatorSubcircuit(
-            trace, index, probabilities=probs, state_vector=vec
-        )
+        p = validate_probabilities(probs)
 
-        return subcircuit
+        tree = ReadoutTreeNode(cursor)
+        tree.simulated_statevector = vec
+
+        for k, v in enumerate(p):
+            nxt_cursor = cursor.copy()
+            nxt_cursor.next_measure()
+            node = tree.subsequent[k] = ReadoutTreeNode(nxt_cursor)
+            node.simulated_probability = v
+
+        ret = Subcircuit(index, start, end, tree=tree)
+
+        return ret

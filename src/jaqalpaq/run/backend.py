@@ -5,7 +5,6 @@ import abc
 import itertools
 
 from jaqalpaq.core.algorithm import expand_macros, fill_in_let
-from jaqalpaq.core.algorithm.walkers import DiscoverSubcircuits
 
 
 class JaqalJob:
@@ -15,7 +14,6 @@ class JaqalJob:
         self.backend = backend
         self.circuit = circuit
         self.expanded_circuit = expand_macros(fill_in_let(circuit))
-        self.traces = DiscoverSubcircuits().visit(self.expanded_circuit)
 
     def __repr__(self):
         return f"<{type(self)} of {self.backend}>"

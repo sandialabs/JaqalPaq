@@ -7,8 +7,9 @@ from numpy import zeros
 
 from pygsti.protocols import ModelFreeformSimulator
 
-from jaqalpaq.core.algorithm.walkers import TraceSerializer
-from jaqalpaq.core.result import ProbabilisticSubcircuit, ReadoutSubcircuit
+from jaqalpaq.core.algorithm.walkers import TraceSerializer, Trace
+from jaqalpaq.run.cursor import SubcircuitCursor, State
+from jaqalpaq.core.result import Subcircuit, ReadoutTreeNode, validate_probabilities
 from jaqalpaq.emulator import backend
 
 from .circuit import pygsti_circuit_from_circuit
@@ -17,29 +18,6 @@ from .model import build_noisy_native_model
 # Set this to True if you would like Subcircuit objects to retain the pyGSTi objects
 # used to generate probabilities during their emulation.
 KEEP_PYGSTI_OBJECTS = False
-
-
-class pyGSTiSubcircuit(ProbabilisticSubcircuit, ReadoutSubcircuit):
-    """Encapsulate one part of the circuit between a prepare_all and measure_all gate.
-
-    This tracks the output of a pyGSTi-generated simulation run, which provides access
-    to emulated measurement outcomes, their relative frequency, the *ideal* measurement
-    probabilities, and the ideal density matrix.
-
-    Additionally, you can also store the pyGSTi "circuit" and "model" objects used for
-    the simulation by setting KEEP_PYGSTI_OBJECTS = True.
-    """
-
-    _pygsti_circuit = None
-    _pygsti_model = None
-
-    def __init__(self, *args, pyGSTi_circuit, pyGSTi_model, density_matrix, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._density_matrix = density_matrix
-
-        if KEEP_PYGSTI_OBJECTS:
-            self._pygsti_circuit = pyGSTi_circuit
-            self._pygsti_model = pyGSTi_model
 
 
 class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
@@ -53,12 +31,17 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
         self.gate_durations = gate_durations if gate_durations is not None else {}
         super().__init__(*args, **kwargs)
 
-    def _make_subcircuit(self, job, index, trace, circ):
+    def _make_subcircuit(self, job, index, start, end):
         """Generate the probabilities of outcomes of a subcircuit
 
         :param Trace trace: the subcircut of circ to generate probabilities for
         :return: A pyGSTi outcome dictionary.
         """
+
+        circ = job.expanded_circuit
+
+        cursor = SubcircuitCursor.terminal_cursor(end)
+        trace = Trace(list(start.address), list(end.address))
 
         pc = pygsti_circuit_from_circuit(
             circ, trace=trace, durations=self.gate_durations
@@ -72,14 +55,24 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
         for k, v in prob_dict.items():
             probs[int(k[::-1], 2)] = v
 
-        return pyGSTiSubcircuit(
-            trace,
-            index,
-            pyGSTi_circuit=pc,
-            pyGSTi_model=model,
-            density_matrix=rho,
-            probabilities=probs,
-        )
+        p = validate_probabilities(probs)
+
+        tree = ReadoutTreeNode(cursor)
+        tree.simulated_density_matrix = rho
+
+        for k, v in enumerate(p):
+            nxt_cursor = cursor.copy()
+            nxt_cursor.next_measure()
+            node = tree.subsequent[k] = ReadoutTreeNode(nxt_cursor)
+            node.simulated_probability = v
+
+        ret = Subcircuit(index, start, end, tree=tree)
+
+        if KEEP_PYGSTI_OBJECTS:
+            ret._pygsti_circuit = pc
+            ret._pygsti_model = model
+
+        return ret
 
 
 class AbstractNoisyNativeEmulator(backend.ExtensibleBackend, CircuitEmulator):
