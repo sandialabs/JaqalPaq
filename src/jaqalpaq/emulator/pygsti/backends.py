@@ -31,15 +31,12 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
         self.gate_durations = gate_durations if gate_durations is not None else {}
         super().__init__(*args, **kwargs)
 
-    def _make_subcircuit(self, job, index, start, end):
+    def _make_subcircuit(self, circ, index, start, end):
         """Generate the probabilities of outcomes of a subcircuit
 
         :param Trace trace: the subcircut of circ to generate probabilities for
         :return: A pyGSTi outcome dictionary.
         """
-
-        circ = job.expanded_circuit
-
         cursor = SubcircuitCursor.terminal_cursor(end)
         trace = Trace(list(start.address), list(end.address))
 

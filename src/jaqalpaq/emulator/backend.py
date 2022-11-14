@@ -8,6 +8,7 @@ from numpy.random import choice
 from jaqalpaq.core.locus import Locus
 from jaqalpaq.core.block import BlockStatement
 from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
+from jaqalpaq.core.algorithm import fill_in_let
 
 from jaqalpaq.run import cursor
 from jaqalpaq.run.result import ExecutionResult, Readout
@@ -102,7 +103,8 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     """Abstract emulator backend for subcircuits that are independent"""
 
     @abc.abstractmethod
-    def _make_subcircuit(self, job, index, start, end):
+
+    def _make_subcircuit(self, circ, index, start, end):
         """(internal) Produce a subcircuit given a trace"""
 
     def _make_readouts(self, subcircuit, results):
@@ -121,10 +123,10 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
 
     def _execute_job(self, job):
         """(internal) Execute the job on the backend"""
-        circ = job.expanded_circuit
+        circ = fill_in_let(job.expanded_circuit)
         subcircs = []
         for n, (start, end) in enumerate(discover_subcircuits(circ)):
-            subcirc = self._make_subcircuit(job, n, start, end)
+            subcirc = self._make_subcircuit(circ, n, start, end)
             subcirc._simulated = True
             subcirc.reset_readouts()
             subcircs.append(subcirc)

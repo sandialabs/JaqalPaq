@@ -4,7 +4,7 @@
 import abc
 import itertools
 
-from jaqalpaq.core.algorithm import expand_macros, fill_in_let
+from jaqalpaq.core.algorithm import expand_macros
 
 
 class JaqalJob:
@@ -13,7 +13,7 @@ class JaqalJob:
     def __init__(self, backend, circuit):
         self.backend = backend
         self.circuit = circuit
-        self.expanded_circuit = expand_macros(fill_in_let(circuit))
+        self.expanded_circuit = expand_macros(circuit)
 
     def __repr__(self):
         return f"<{type(self)} of {self.backend}>"

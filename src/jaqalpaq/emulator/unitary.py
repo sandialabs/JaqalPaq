@@ -83,7 +83,7 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
     This object should be treated as an opaque symbol to be passed to run_jaqal_circuit.
     """
 
-    def _make_subcircuit(self, job, index, start, end):
+    def _make_subcircuit(self, circ, index, start, end):
         """Generate the ProbabilisticSubcircuit associated with the trace of circuit
             being process in job.
 
@@ -92,9 +92,6 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
         :param Trace trace: the trace of the subcircuit
         :return: A ProbabilisticSubcircuit.
         """
-
-        circ = job.expanded_circuit
-
         gatedefs = circ.native_gates
 
         # fill_in_let modified the circuit here
