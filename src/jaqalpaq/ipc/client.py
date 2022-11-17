@@ -10,10 +10,11 @@ import os
 import socket, select
 import json
 
-from jaqalpaq.generator import generate_jaqal_program
-from jaqalpaq.core.result import ExecutionResult, Subcircuit, ReadoutTreeNode
-from jaqalpaq.core.algorithm.walkers import discover_subcircuits
 from jaqalpaq.error import JaqalError
+from jaqalpaq.core.algorithm.walkers import discover_subcircuits
+from jaqalpaq.generator import generate_jaqal_program
+
+from jaqalpaq.run.result import ExecutionResult, Subcircuit, ReadoutTreeNode
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend
 
 

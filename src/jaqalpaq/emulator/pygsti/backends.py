@@ -9,7 +9,7 @@ from pygsti.protocols import ModelFreeformSimulator
 
 from jaqalpaq.core.algorithm.walkers import TraceSerializer, Trace
 from jaqalpaq.run.cursor import SubcircuitCursor, State
-from jaqalpaq.core.result import Subcircuit, ReadoutTreeNode, validate_probabilities
+from jaqalpaq.run.result import Subcircuit, ReadoutTreeNode, validate_probabilities
 from jaqalpaq.emulator import backend
 
 from .circuit import pygsti_circuit_from_circuit

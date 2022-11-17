@@ -7,10 +7,10 @@ from numpy.random import choice
 
 from jaqalpaq.core.locus import Locus
 from jaqalpaq.core.block import BlockStatement
-from jaqalpaq.core.result import ExecutionResult, Readout
 from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
 
 from jaqalpaq.run import cursor
+from jaqalpaq.run.result import ExecutionResult, Readout
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend, AbstractBackend
 
 

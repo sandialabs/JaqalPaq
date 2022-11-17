@@ -6,7 +6,7 @@ import numpy
 from jaqalpaq.error import JaqalError
 from jaqalpaq.core.algorithm.walkers import TraceSerializer, Trace
 from jaqalpaq.run.cursor import SubcircuitCursor, State
-from jaqalpaq.core.result import Subcircuit, ReadoutTreeNode, validate_probabilities
+from jaqalpaq.run.result import Subcircuit, ReadoutTreeNode, validate_probabilities
 from jaqalpaq.emulator.backend import EmulatedIndependentSubcircuitsBackend
 from ._import import get_ideal_action
 

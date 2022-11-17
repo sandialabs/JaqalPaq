@@ -4,13 +4,14 @@
 import warnings
 from collections import OrderedDict
 
-from .branch import BranchStatement
-from .block import BlockStatement
-from .algorithm import fill_in_let, expand_macros
-from .algorithm.visitor import Visitor
-from .algorithm.walkers import walk_circuit, discover_subcircuits
+from jaqalpaq.core.branch import BranchStatement
+from jaqalpaq.core.block import BlockStatement
+from jaqalpaq.core.algorithm import fill_in_let, expand_macros
+from jaqalpaq.core.algorithm.visitor import Visitor
+from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
 from jaqalpaq.error import JaqalError
 from jaqalpaq.run.cursor import SubcircuitCursor, State
+from .cursor import SubcircuitCursor
 
 
 # Warn if probabilities/normalized_counts are greater than CUTOFF_WARN, and

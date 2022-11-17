@@ -8,7 +8,7 @@ import numpy as np
 from jaqalpaq.emulator import run_jaqal_string, run_jaqal_circuit, run_jaqal_file
 from jaqalpaq.generator import generate_jaqal_program
 import jaqalpaq.parser
-from jaqalpaq.core.result import ExecutionResult, parse_jaqal_output_list
+from jaqalpaq.run.result import ExecutionResult, parse_jaqal_output_list
 from collections import OrderedDict
 from jaqalpaq.emulator._validator import (
     generate_jaqal_validation,
