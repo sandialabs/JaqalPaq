@@ -13,7 +13,7 @@ BLOCK_SIZE = 4096  # size recommended by Python docs
 POLLING_TIMEOUT = 0.1
 
 
-def ipc_protocol_connection(conn, backend):
+def ipc_protocol_read(conn):
     resp_list = []
     started = False
     while True:
@@ -27,15 +27,21 @@ def ipc_protocol_connection(conn, backend):
 
         if started:
             break
-    resp_text = "".join(resp_list)
 
+    return "".join(resp_list)
+
+
+def ipc_protocol_parse(resp_text):
     # Unvalidated and unauthenticated network-received data is being passed to
     # the Jaqal emulator here.
     circ = parse_jaqal_string(resp_text)
-    results = []
-    res = backend(circ).execute()
+    return circ
 
-    for subcirc in res.subcircuits:
+
+def ipc_protocol_write(conn, exe_res):
+    results = []
+
+    for subcirc in exe_res.subcircuits:
         results.append(list(subcirc.probability_by_int))
 
     return conn.send(json.dumps(results).encode())
@@ -89,6 +95,12 @@ def main(argv):
         nargs=1,
         help="Choose the random seed that numpy uses. Defaults to a function of the current time.",
     )
+    parser.add_argument(
+        "--debug",
+        default=False,
+        action="store_true",
+        help="Start a Jupyter server after reading from the socket.",
+    )
 
     ns = parser.parse_args(argv)
 
@@ -102,11 +114,19 @@ def main(argv):
 
     modname = ns.backend.split("(", maxsplit=1)[0].rsplit(".", maxsplit=1)[0]
     exec(f"import {modname}")
+    backend = eval(ns.backend)
 
     with choose_socket(ns) as server:
         server.listen(1)
         conn, addr = server.accept()
-        ipc_protocol_connection(conn, eval(ns.backend))
+        resp_text = ipc_protocol_read(conn)
+        if ns.debug:
+            import IPython
+
+            IPython.embed_kernel()
+        circ = ipc_protocol_parse(resp_text)
+        exe_res = backend(circ).execute()
+        ipc_protocol_write(conn, exe_res)
 
     return 0
 
