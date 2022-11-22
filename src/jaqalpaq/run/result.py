@@ -24,7 +24,7 @@ assert CUTOFF_WARN <= CUTOFF_FAIL
 assert CUTOFF_ZERO <= CUTOFF_WARN
 
 
-def parse_jaqal_output_list(circuit, output):
+def parse_jaqal_output_list(circuit, output, overrides=None):
     """Parse experimental output into an :class:`ExecutionResult` providing collated and
     uncollated access to the output.
 
@@ -78,18 +78,19 @@ def parse_jaqal_output_list(circuit, output):
     else:
         raise JaqalError("Unable to parse output: too many values")
 
-    return ExecutionResult(circuit, subcircuits, res)
+    return ExecutionResult(circuit, subcircuits, overrides, res)
 
 
 class ExecutionResult:
     "Captures the results of a Jaqal program's execution, on hardware or an emulator."
 
-    def __init__(self, circuit, subcircuits, readouts=None, *, timestamp=None):
+    def __init__(self, circuit, subcircuits, overrides, readouts=None, *, timestamp=None):
         """(internal) Initializes an ExecutionResult object.
 
         :param Circuit circuit:  The circuit for which these results will represent.
         :param list[Subcircuit] output:  The subcircuits bounded at the beginning by a
             prepare_all statement, and at the end by a measure_all statement.
+        :param dict overrides: The overrides, if any, made to the Jaqal circuit.
         :param list[Readout] output:  The measurements made during the running of the
             Jaqal problem.
         """

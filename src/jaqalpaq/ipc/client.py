@@ -116,4 +116,4 @@ class IPCBackend(IndependentSubcircuitsBackend):
         if n + 1 < len(freqs):
             raise JaqalError("Unable to parse output: too many values")
 
-        return result.ExecutionResult(circ, subcircs, None)
+        return result.ExecutionResult(circ, subcircs, job.overrides, None)

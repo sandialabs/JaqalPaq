@@ -10,10 +10,11 @@ from jaqalpaq.core.algorithm import expand_macros
 class JaqalJob:
     """Jaqal Compute Job"""
 
-    def __init__(self, backend, circuit):
+    def __init__(self, backend, circuit, overrides=None):
         self.backend = backend
         self.circuit = circuit
         self.expanded_circuit = expand_macros(circuit)
+        self.overrides = overrides
 
     def __repr__(self):
         return f"<{type(self)} of {self.backend}>"
@@ -58,7 +59,7 @@ class AbstractBackend:
 class IndependentSubcircuitsBackend(AbstractBackend):
     """Abstract backend for subcircuits that are independent"""
 
-    def __call__(self, circuit):
+    def __call__(self, circuit, *, overrides=None):
         """Attaches the backend to a particular circuit, creating a Job object.
 
         Calculates the probabilities of outcomes for every subcircuit.
@@ -67,6 +68,6 @@ class IndependentSubcircuitsBackend(AbstractBackend):
 
         :returns IndependentSubcircuitsJob:
         """
-        job = JaqalJob(self, circuit)
+        job = JaqalJob(self, circuit, overrides=overrides)
 
         return job
