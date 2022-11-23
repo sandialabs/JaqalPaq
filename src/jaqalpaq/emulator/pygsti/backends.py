@@ -9,7 +9,7 @@ from pygsti.protocols import ModelFreeformSimulator
 
 from jaqalpaq.core.algorithm.walkers import TraceSerializer, Trace
 from jaqalpaq.run.cursor import SubcircuitCursor, State
-from jaqalpaq.run.result import Subcircuit, ReadoutTreeNode, validate_probabilities
+from jaqalpaq.run import result
 from jaqalpaq.emulator import backend
 
 from .circuit import pygsti_circuit_from_circuit
@@ -52,18 +52,18 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
         for k, v in prob_dict.items():
             probs[int(k[::-1], 2)] = v
 
-        p = validate_probabilities(probs)
+        p = result.validate_probabilities(probs)
 
-        tree = ReadoutTreeNode(cursor)
+        tree = result.ReadoutTreeNode(cursor)
         tree.simulated_density_matrix = rho
 
         for k, v in enumerate(p):
             nxt_cursor = cursor.copy()
             nxt_cursor.next_measure()
-            node = tree.subsequent[k] = ReadoutTreeNode(nxt_cursor)
+            node = tree.subsequent[k] = result.ReadoutTreeNode(nxt_cursor)
             node.simulated_probability = v
 
-        ret = Subcircuit(index, start, end, tree=tree)
+        ret = result.Subcircuit(index, start, end, tree=tree)
 
         if KEEP_PYGSTI_OBJECTS:
             ret._pygsti_circuit = pc

@@ -14,7 +14,7 @@ from jaqalpaq.error import JaqalError
 from jaqalpaq.core.algorithm.walkers import discover_subcircuits
 from jaqalpaq.generator import generate_jaqal_program
 
-from jaqalpaq.run.result import ExecutionResult, Subcircuit, ReadoutTreeNode
+from jaqalpaq.run import result
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend
 
 
@@ -103,7 +103,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         subcircs = []
 
         for n, (start, end) in enumerate(discover_subcircuits(circ)):
-            subcirc = Subcircuit(n, start, end)
+            subcirc = result.Subcircuit(n, start, end)
             subcircs.append(subcirc)
 
             for k, nc in enumerate(freqs[n]):
@@ -116,4 +116,4 @@ class IPCBackend(IndependentSubcircuitsBackend):
         if n + 1 < len(freqs):
             raise JaqalError("Unable to parse output: too many values")
 
-        return ExecutionResult(subcircs, None)
+        return result.ExecutionResult(subcircs, None)

@@ -5,8 +5,7 @@ import numpy
 
 from jaqalpaq.error import JaqalError
 from jaqalpaq.run.cursor import SubcircuitCursor, State
-import jaqalpaq.run.result
-from jaqalpaq.run.result import Subcircuit, ReadoutTreeNode, validate_probabilities
+from jaqalpaq.run import result
 from jaqalpaq.emulator.backend import EmulatedIndependentSubcircuitsBackend
 from ._import import get_ideal_action
 
@@ -108,17 +107,17 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
         def handle_final_measurement(cursor, vec):
             subs = {}
             P = numpy.abs(vec) ** 2
-            P = validate_probabilities(P)
+            P = result.validate_probabilities(P)
             for i, prob in enumerate(P):
-                if prob <= jaqalpaq.run.result.CUTOFF_ZERO:
+                if prob <= result.CUTOFF_ZERO:
                     continue
                 meas_cursor = cursor.copy()
                 meas = meas_cursor.next_measure()
                 assert meas_cursor.state == State.shutdown
-                sub = ReadoutTreeNode(meas_cursor)
+                sub = result.ReadoutTreeNode(meas_cursor)
                 sub.simulated_probability = prob
                 subs[i] = sub
-            res = ReadoutTreeNode(cursor, subsequent=subs)
+            res = result.ReadoutTreeNode(cursor, subsequent=subs)
             res.state_vector = vec
             return res
 
@@ -156,6 +155,6 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
                 raise NotImplementedError()
 
         tree = handle_unitary(cursor, vec)
-        ret = Subcircuit(index, start, end=end, tree=tree)
+        ret = result.Subcircuit(index, start, end=end, tree=tree)
 
         return ret

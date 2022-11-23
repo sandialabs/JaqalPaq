@@ -10,8 +10,7 @@ from jaqalpaq.core.block import BlockStatement
 from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
 from jaqalpaq.core.algorithm import fill_in_let
 
-from jaqalpaq.run import cursor
-from jaqalpaq.run.result import ExecutionResult, Readout
+from jaqalpaq.run import result, cursor
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend, AbstractBackend
 
 
@@ -114,7 +113,7 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
                 keys = list(node.subsequent.keys())
                 p = [node.subsequent[k].simulated_probability for k in keys]
                 nxt = choice(keys, p=p)
-                mr = Readout(nxt, len(results), node)
+                mr = result.Readout(nxt, len(results), node)
                 results.append(mr)
                 yield mr
                 node = node[nxt]
@@ -148,4 +147,4 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
         for subcirc in subcircs:
             subcirc.normalize_counts()
 
-        return ExecutionResult(subcircs, results)
+        return result.ExecutionResult(subcircs, results)
