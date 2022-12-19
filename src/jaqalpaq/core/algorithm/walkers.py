@@ -126,7 +126,7 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         if block.subcircuit:
             self.end_trace(context=context)
 
-        if had_started and (reps > 1) and (len(self.subcircuits) != count):
+        if had_started and (len(self.subcircuits) != count) and (reps > 1):
             raise JaqalError("measure_all -> prepare_all not supported in loops")
 
         return indices
