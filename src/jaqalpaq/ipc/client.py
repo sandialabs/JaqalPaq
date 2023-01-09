@@ -44,7 +44,9 @@ class IPCBackend(IndependentSubcircuitsBackend):
         try:
             return socket.create_connection(self._address)
         except Exception as exc:
-            raise JaqalError(f"Could not connect to host {':'.join(address)}: {exc}")
+            raise JaqalError(
+                f"Could not connect to host {':'.join(self._address)}: {exc}"
+            )
 
     def _communicate(self, socket, data):
         socket.send(data)
