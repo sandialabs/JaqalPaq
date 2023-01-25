@@ -172,3 +172,13 @@ class SubcircuitCursor:
         ret._state = self._state
         ret._loop_stack = self._loop_stack.copy()
         return ret
+
+    def __eq__(self, other):
+        if not isinstance(other, SubcircuitCursor):
+            return False
+        if self._locus != other._locus:
+            return False
+        if self._loop_stack != other._loop_stack:
+            return False
+        assert self._state == other._state
+        return True
