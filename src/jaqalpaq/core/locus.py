@@ -79,3 +79,12 @@ class Locus:
 
     def __repr__(self):
         return f"Locus<{self.address}>"
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        return (
+            (self._object == other._object)
+            and (self._parent == other._parent)
+            and (self._index == other._index)
+        )
