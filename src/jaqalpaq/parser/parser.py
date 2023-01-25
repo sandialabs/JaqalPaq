@@ -20,6 +20,7 @@ def parse_jaqal_file(
     inject_pulses=None,
     autoload_pulses=True,
     import_path=None,
+    use_name=True,
 ):
     """Parse a file written in Jaqal into core types.
 
@@ -34,6 +35,7 @@ def parse_jaqal_file(
     :param inject_pulses: If given, use these pulses specifically.
     :param bool autoload_pulses: Whether to employ the usepulses statement for parsing.  Requires appropriate gate definitions.
     :param str import_path: The path to be used for relative Jaqal imports. Defaults to the file's directory.
+    :param bool use_name:to remember the name of the Jaqal file
     :return: The circuit representation of the file and usepulses if
         requested. usepulses is stored in a dict under the key
         'usepulses'. It is itself a dict mapping :class:`Identifier`
@@ -54,6 +56,7 @@ def parse_jaqal_file(
             inject_pulses=inject_pulses,
             autoload_pulses=autoload_pulses,
             import_path=import_path,
+            name_hint=f"from '{filename}'" if use_name else None,
         )
 
 
@@ -67,6 +70,7 @@ def parse_jaqal_string(
     inject_pulses=None,
     autoload_pulses=True,
     import_path=None,
+    name_hint=None,
 ):
     """Parse a string written in Jaqal into core types.
 
@@ -81,6 +85,7 @@ def parse_jaqal_string(
     :param inject_pulses: If given, use these pulses specifically.
     :param bool autoload_pulses: Whether to employ the usepulses statement for parsing.  Requires appropriate gate definitions.
     :param str import_path: The path to be used for relative Jaqal imports. Defaults to the current working directory.
+    :param str name_hint: Name to give to the circuit.
     :return: The circuit representation of the file and usepulses if
         requested. usepulses is stored in a dict under the key
         'usepulses'. It is itself a dict mapping :class:`Identifier`
@@ -111,6 +116,9 @@ def parse_jaqal_string(
 
     if sum(reg.fundamental for reg in circuit.registers.values()) > 1:
         raise JaqalError(f"Circuit has too many registers: {list(circuit.registers)}")
+
+    if name_hint:
+        circuit._name_hint = name_hint
 
     if return_usepulses:
         return circuit, {"usepulses": usepulses}

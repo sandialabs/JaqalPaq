@@ -46,7 +46,10 @@ class MacroExpander(Visitor):
         gates."""
 
         self.macros = circuit.macros
-        new_circuit = Circuit(native_gates=circuit.native_gates)
+        new_circuit = Circuit(
+            native_gates=circuit.native_gates,
+            name=f"(expanded) {circuit._name_hint}" if circuit._name_hint else None,
+        )
         if self.preserve_definitions:
             new_circuit.macros.update(circuit.macros)
         new_circuit.constants.update(circuit.constants)
