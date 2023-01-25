@@ -35,13 +35,20 @@ class Circuit:
 
     """
 
-    def __init__(self, native_gates=None):
+    def __init__(self, native_gates=None, *, name=None):
         self._constants = {}
         self._macros = {}
         self._registers = {}
         self._native_gates = normalize_native_gates(native_gates)
         self._body = BlockStatement()
         self._usepulses = []
+        self._name_hint = name
+
+    def _repr_pretty_(self, printer, cycle=False):
+        if self._name_hint:
+            printer.text(f"<Circuit {self._name_hint}>")
+        else:
+            printer.text(repr(self))
 
     def __repr__(self):
         return f"Circuit(usepulses={self._usepulses}, constants={self._constants}, macros={self._macros}, native_gates={self._native_gates}, registers={self._registers}, body={self._body})"
