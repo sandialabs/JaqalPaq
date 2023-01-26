@@ -107,10 +107,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
             subcircs.append(subcirc)
 
             for k, nc in enumerate(freqs[n]):
-                try:
-                    nxt_node = subcirc._tree[k]
-                except KeyError:
-                    nxt_node = subcirc._tree._spawn(k)
+                nxt_node = subcirc._tree.force_get(k)
                 nxt_node.normalized_count = nc
 
         if n + 1 < len(freqs):

@@ -180,6 +180,12 @@ class ReadoutTreeNode:
 
         return self.subsequent[index]
 
+    def force_get(self, index, cursor=None):
+        try:
+            return self[index]
+        except KeyError:
+            return self._spawn(index, cursor=cursor)
+
     def _spawn(self, index, cursor=None):
         if cursor is None:
             cursor = self.classical_state.copy()
@@ -215,6 +221,10 @@ class ReadoutTreeNode:
         for n, i in enumerate(index):
             if isinstance(i, str):
                 i = int(i[::-1], 2)
+            elif not isinstance(i, int):
+                raise TypeError(
+                    f"JaqalPaq: lookup address must by integers or strings, not {type(i)}"
+                )
 
             try:
                 tree = tree.subsequent[i]
@@ -401,10 +411,7 @@ class SubcircuitResult:
             readout._node = node
             self._readouts.append(readout)
             total += 1
-            try:
-                node = node[readout.as_int]
-            except KeyError:
-                node = node._spawn(readout.as_int)
+            node = node.force_get(readout.as_int)
             node.normalized_count += 1
         return total
 
