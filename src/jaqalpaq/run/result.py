@@ -10,9 +10,11 @@ from jaqalpaq.core.block import BlockStatement
 from jaqalpaq.core.algorithm import fill_in_let, expand_macros
 from jaqalpaq.core.algorithm.visitor import Visitor
 from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
+from jaqalpaq.core.locus import Locus
 from jaqalpaq.error import JaqalError
 from jaqalpaq.run.cursor import SubcircuitCursor, State
 from .cursor import SubcircuitCursor
+from .classical_cursor import ClassicalCursor
 
 
 # Warn if probabilities/normalized_counts are greater than CUTOFF_WARN, and
@@ -84,20 +86,40 @@ def parse_jaqal_output_list(circuit, output, overrides=None):
 class ExecutionResult:
     "Captures the results of a Jaqal program's execution, on hardware or an emulator."
 
-    def __init__(self, circuit, subcircuits, overrides, readouts=None, *, timestamp=None):
+    def __init__(self, circuit, overrides, *, timestamp=None, **kwargs):
         """(internal) Initializes an ExecutionResult object.
 
         :param Circuit circuit:  The circuit for which these results will represent.
-        :param list[Subcircuit] output:  The subcircuits bounded at the beginning by a
-            prepare_all statement, and at the end by a measure_all statement.
         :param dict overrides: The overrides, if any, made to the Jaqal circuit.
+        :param float timestamp: The time at which these results were generated.
         :param list[Readout] output:  The measurements made during the running of the
             Jaqal problem.
         """
-        self._circuit = circuit
         self.time = time.time() if timestamp is None else timestamp
-        self._subcircuits = subcircuits
-        self._readouts = readouts
+        self._circuit = circuit
+        subcirc_loci = self._subcircuits_loci = list(discover_subcircuits(circuit))
+        sno = list(walk_circuit(circuit, [start for (start, end) in subcirc_loci]))
+
+        self._classical_cursor = cc = ClassicalCursor(overrides, subcirc_list=sno)
+        self._attributes = kwargs
+
+        self._subcircuits = subcircs = []
+        for sb in cc.by_subbatch:
+            filled_circ = fill_in_let(circuit, override_dict=sb.overrides)
+            scs = {}
+            subcircs.append(scs)
+            for sc in sb.by_subcircuit:
+                sc_i = sc.subcircuit_i
+                sc_start, sc_end = subcirc_loci[sc_i]
+                # Need this to reference filled_circ
+                sc_start = Locus.from_address(filled_circ, sc_start.address)
+                if sc_start is not sc_end:
+                    sc_end = Locus.from_address(filled_circ, sc_end.address)
+                else:
+                    sc_end = sc_start
+                scs[sc_i] = SubcircuitResult(
+                    sc_i, sc_start, sc_end, sb.index, len(sc.by_time), circuit
+                )
 
     def _repr_pretty_(self, printer, cycle=False):
         printer.text(f"<ExecutionResult@{self._repr_time()} of ")
@@ -109,6 +131,10 @@ class ExecutionResult:
 
     def __repr__(self):
         return f"<ExecutionResult@{self._repr_time()} of {self._circuit}>"
+
+    @property
+    def subcircuits_loci(self):
+        return self._subcircuits_loci
 
 
 class Readout:
@@ -245,13 +271,16 @@ def update_tree(update_node, tree):
 class SubcircuitResult:
     """(internal) Encapsulate results from the part of a circuit between a prepare_all and measure_all gate."""
 
-    def __init__(self, index, start, end, circuit, *, tree=None):
+    def __init__(
+        self, index, start, end, subbatch_i, circuitindex_c, circuit, *, tree=None
+    ):
         """(internal) Instantiate a Subcircuit"""
         self._start = start
         if isinstance(start.object, BlockStatement) and start.object.subcircuit:
             assert end == start
         self._end = end
         self._index = int(index)
+        self.circuitindex_c = circuitindex_c
         self._circuit = circuit
         if tree is not None:
             self._tree = tree
@@ -259,13 +288,21 @@ class SubcircuitResult:
         else:
             tree = self._tree = ReadoutTreeNode(SubcircuitCursor.terminal_cursor(end))
             tree._owner = self
-        tree.simulated_probability = tree.normalized_count = 1
         self._prepare_actions = []
         self._simulated = False
+        self.subbatch_i = subbatch_i
 
     @property
     def index(self):
         return self._index
+
+    @property
+    def start(self):
+        return self._start
+
+    @property
+    def end(self):
+        return self._end
 
     @property
     def circuit(self):
@@ -302,12 +339,24 @@ class SubcircuitResult:
                 child.normalized_count /= node.normalized_count
 
         update_tree(_update, self._tree)
-        self._tree.num_repeats = self._tree.normalized_count
-        self._tree.normalized_count = 1
+        self._tree.num_repeats = self._tree.normalized_count.astype(int)
+        self._tree.normalized_count[:] = 1
 
     def _prepare_tree_node(self, new):
         for action in self._prepare_actions:
             action(new)
+
+    def _result_array(self):
+        import numpy
+
+        return numpy.zeros(self.circuitindex_c)
+
+    def _prepare_normalized_count(self, new):
+        new.normalized_count = self._result_array()
+
+    def _reset_normalized_counts(self):
+        update_tree(self._prepare_normalized_count, self._tree)
+        self._prepare_actions = [self._prepare_normalized_count]
 
 
 def validate_probabilities(probabilities):
