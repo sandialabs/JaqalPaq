@@ -3,6 +3,7 @@
 # certain rights in this software.
 import warnings
 from collections import OrderedDict
+import time
 
 from jaqalpaq.core.branch import BranchStatement
 from jaqalpaq.core.block import BlockStatement
@@ -83,7 +84,7 @@ def parse_jaqal_output_list(circuit, output):
 class ExecutionResult:
     "Captures the results of a Jaqal program's execution, on hardware or an emulator."
 
-    def __init__(self, circuit, subcircuits, readouts=None):
+    def __init__(self, circuit, subcircuits, readouts=None, *, timestamp=None):
         """(internal) Initializes an ExecutionResult object.
 
         :param Circuit circuit:  The circuit for which these results will represent.
@@ -91,11 +92,22 @@ class ExecutionResult:
             prepare_all statement, and at the end by a measure_all statement.
         :param list[Readout] output:  The measurements made during the running of the
             Jaqal problem.
-
         """
         self._circuit = circuit
+        self.time = time.time() if timestamp is None else timestamp
         self._subcircuits = subcircuits
         self._readouts = readouts
+
+    def _repr_pretty_(self, printer, cycle=False):
+        printer.text(f"<ExecutionResult@{self._repr_time()} of ")
+        printer.pretty(self._circuit)
+        printer.text(">")
+
+    def _repr_time(self):
+        return f"{time.strftime('%Y-%m-%dT%H:%M:%S',time.gmtime(self.time))}.{int((self.time%1)*1000000)}Z"
+
+    def __repr__(self):
+        return f"<ExecutionResult@{self._repr_time()} of {self._circuit}>"
 
     @property
     def readouts(self):
@@ -144,8 +156,13 @@ class Readout:
         """The measured result encoded as a string of qubit values."""
         return f"{self._result:b}".zfill(self._node.bits)[::-1]
 
+    def _repr_pretty_(self, printer, cycle=False):
+        printer.text(f"<Readout {self.as_str} index {self._index} from ")
+        printer.pretty(self._subcircuit)
+        printer.text(">")
+
     def __repr__(self):
-        return f"<{type(self).__name__} {self.as_str} index {self._index} from {self._subcircuit.index}>"
+        return f"<Readout {self.as_str} index {self._index} from {self._subcircuit}>"
 
 
 class ReadoutTreeNode:
@@ -325,8 +342,13 @@ class Subcircuit:
             raise JaqalError("Circuits must have exactly one register") from exc
         return list(reg)
 
+    def _repr_pretty_(self, printer, cycle=False):
+        printer.text(f"<SubcircuitResult {self._index}@{self._start} of ")
+        printer.pretty(self.circuit)
+        printer.text(">")
+
     def __repr__(self):
-        return f"<{type(self).__name__} {self._index}@{self._start}>"
+        return f"<SubcircuitResult {self._index}@{self._start} of {self.circuit}>"
 
     def copy(self):
         new = object.__new__(type(self))
