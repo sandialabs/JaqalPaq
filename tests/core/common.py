@@ -28,7 +28,9 @@ def assert_values_same(tester, value0, value1, message=None):
         tester.assertEqual(value0, value1, message)
 
 
-def make_random_parameter(name=None, allowed_types=None, return_params=False):
+def make_random_parameter(
+    name=None, allowed_types=None, return_params=False, variadic=False
+):
     """Return a parameter with a random type and name."""
     if name is None:
         name = random_identifier()
@@ -37,14 +39,16 @@ def make_random_parameter(name=None, allowed_types=None, return_params=False):
     param_type = random.choice(allowed_types)
     if param_type not in ParamType:
         raise ValueError(f"Unknown parameter type {param_type}")
-    param = Parameter(name, param_type)
+    param = Parameter(name, param_type, variadic=variadic)
     if not return_params:
         return param
     else:
         return param, name, param_type
 
 
-def make_random_parameter_list(*, parameter_types=None, allowed_types=None, count=None):
+def make_random_parameter_list(
+    *, parameter_types=None, allowed_types=None, count=None, variadic=False
+):
     """Return a list of Parameter objects."""
     if parameter_types is not None:
         if allowed_types is not None:
@@ -60,11 +64,13 @@ def make_random_parameter_list(*, parameter_types=None, allowed_types=None, coun
             count = random_integer(lower=0, upper=16)
     param_list = []
     names_used = set()
-    for _ in range(count):
+    for i in range(count):
         if parameter_types is not None:
             allowed_types = [parameter_types.pop(0)]
         while True:
-            param = make_random_parameter(allowed_types=allowed_types)
+            param = make_random_parameter(
+                allowed_types=allowed_types, variadic=variadic and i == count - 1
+            )
             if param.name not in names_used:
                 names_used.add(param.name)
                 break
@@ -179,7 +185,11 @@ def make_random_slice(upper):
 
 
 def make_random_gate_definition(
-    name=None, parameter_count=None, parameter_types=None, return_params=False
+    name=None,
+    parameter_count=None,
+    parameter_types=None,
+    return_params=False,
+    variadic=False,
 ):
     """Create a random gate definition."""
     if name is None:
@@ -189,10 +199,12 @@ def make_random_gate_definition(
             parameter_count = random_integer(lower=0, upper=16)
         allowed_types = VALID_GATE_ARG_TYPES + [ParamType.NONE]
         parameters = make_random_parameter_list(
-            count=parameter_count, allowed_types=allowed_types
+            count=parameter_count, allowed_types=allowed_types, variadic=variadic
         )
     else:
-        parameters = make_random_parameter_list(parameter_types=parameter_types)
+        parameters = make_random_parameter_list(
+            parameter_types=parameter_types, variadic=variadic
+        )
     gatedef = GateDefinition(name, parameters=parameters)
     if not return_params:
         return gatedef
@@ -204,12 +216,29 @@ def make_random_argument_list(argument_types):
     """Return a list of randomly produced gate arguments of the appropriate type.
     For any value whatsoever, use the None type. Note: This will never create
     a register since that is not a valid Jaqal gate argument."""
+
+    # Although Jaqalpaq currently restricts variadic parameters to be
+    # in final position, this function does not enforce that
+    # restriction and instead relies on the caller to only request
+    # variadic parameters at valid positions.
+
     arguments = []
     for arg_type in argument_types:
         if arg_type is None:
             arg_type = random.choice(VALID_GATE_ARG_TYPES)
-        arg = make_random_value(arg_type)
-        arguments.append(arg)
+        if isinstance(arg_type, tuple):
+            arg_type, variadic = arg_type
+            if variadic:
+                # Zero is a valid number of arguments to give to a
+                # variadic parameter.
+                count = random_integer(lower=0, upper=4)
+                arguments.extend(make_random_value(arg_type) for _ in range(count))
+            else:
+                arg = make_random_value(arg_type)
+                arguments.append(arg)
+        else:
+            arg = make_random_value(arg_type)
+            arguments.append(arg)
     return arguments
 
 

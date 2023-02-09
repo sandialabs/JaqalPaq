@@ -31,6 +31,11 @@ class AbstractGate:
         else:
             self._parameters = parameters
 
+        if any(param.variadic for param in self._parameters[:-1]):
+            # This restriction may be relaxed if necessary but will
+            # require more extensive code changes
+            raise JaqalError(f"Only final parameters may be variadic")
+
         if ideal_unitary is not None:
             warnings.warn("Define unitary in <path>.jaqal_action", DeprecationWarning)
             self._ideal_unitary = ideal_unitary
@@ -73,35 +78,23 @@ class AbstractGate:
         :raises JaqalError: If the parameter names don't match the parameters this gate
             takes.
         """
-        params = OrderedDict()
-        if args and not kwargs:
-            if len(args) > len(self.parameters):
-                raise JaqalError(f"Too many parameters for gate {self.name}.")
-            elif len(args) > len(self.parameters):
-                raise JaqalError(f"Insufficient parameters for gate {self.name}.")
-            else:
-                for name, arg in zip([param.name for param in self.parameters], args):
-                    params[name] = arg
-        elif kwargs and not args:
-            try:
-                for param in self.parameters:
-                    params[param.name] = kwargs.pop(param.name)
-            except KeyError as ex:
-                raise JaqalError(
-                    f"Missing parameter {param.name} for gate {self.name}."
-                ) from ex
-            if kwargs:
-                raise JaqalError(
-                    f"Invalid parameters {', '.join(kwargs)} for gate {self.name}."
-                )
+
+        if kwargs and not args:
+            params = self._set_from_kwargs(kwargs)
         elif kwargs and args:
             raise JaqalError(
                 "Cannot mix named and positional parameters in call to gate."
             )
-        if len(self.parameters) != len(params):
-            raise JaqalError(
-                f"Bad argument count: expected {len(self.parameters)}, found {len(params)}"
-            )
+        else:
+            # This also covers the case where we have no arguments, to
+            # allow for variadic parameters given zero arguments.
+            params = self._set_from_args(args)
+
+        # the _set_from_* functions should have already caught this
+        assert len(self.parameters) == len(
+            params
+        ), f"Expected {len(self.parameters)}, found {len(params)}"
+
         for param in self.parameters:
             param.validate(params[param.name])
         return params
@@ -110,6 +103,54 @@ class AbstractGate:
         """(deprecated) use gatedef(*args) instead"""
         warnings.warn("Use gatedef() instead of gatedef.call()", DeprecationWarning)
         return self(*args, **kwargs)
+
+    def _set_from_args(self, args):
+        """Check our incoming arguments for type and count, accounting for any
+        variadic parameters.
+
+        :param args: The list of arguments provided to this gate.
+        """
+        params = OrderedDict()
+        unary_params = [param for param in self.parameters if not param.variadic]
+        variadic_params = [param for param in self.parameters if param.variadic]
+
+        # These should have already been checked in the constructor.
+        assert len(variadic_params) <= 1, "Only one variadic parameter supported"
+        assert not variadic_params or variadic_params[0] == self.parameters[-1]
+
+        if len(args) < len(unary_params):
+            raise JaqalError(f"Insufficient parameters for gate {self.name}.")
+        elif not variadic_params and len(args) > len(unary_params):
+            raise JaqalError(f"Too many parameters for gate {self.name}.")
+
+        unary_param_names = [param.name for param in unary_params]
+        unary_args = args[: len(unary_params)]
+        for name, arg in zip(unary_param_names, unary_args):
+            params[name] = arg
+
+        if variadic_params:
+            rest_args = list(args[len(unary_params) :])
+            assert len(unary_params) + len(rest_args) == len(args)
+            params[variadic_params[0].name] = rest_args
+
+        return params
+
+    def _set_from_kwargs(self, kwargs):
+        """Check our incoming keyword arguments for type and count in the case
+        of variadic arguments."""
+        params = OrderedDict()
+        try:
+            for param in self.parameters:
+                params[param.name] = kwargs.pop(param.name)
+        except KeyError as ex:
+            raise JaqalError(
+                f"Missing parameter {param.name} for gate {self.name}."
+            ) from ex
+        if kwargs:
+            raise JaqalError(
+                f"Invalid parameters {', '.join(kwargs)} for gate {self.name}."
+            )
+        return params
 
     def __call__(self, *args, **kwargs):
         params = self.parse_parameters(*args, **kwargs)

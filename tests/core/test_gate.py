@@ -14,6 +14,10 @@ class GateTester(unittest.TestCase):
         )
         self.assertEqual(definition.name, gate.name)
         self.assertEqual({}, gate.parameters)
+        self.assertEqual(definition, gate.gate_def)
+        # This tests the constructor for GateStatement when not given
+        # parameters
+        self.assertEqual(gate, GateStatement(definition))
 
     def test_create_gate_with_parameters(self):
         """Test creating a gate with parameters."""
@@ -23,3 +27,4 @@ class GateTester(unittest.TestCase):
         )
         self.assertEqual(definition.name, gate.name)
         self.assertEqual(arguments, gate.parameters)
+        self.assertEqual(definition, gate.gate_def)

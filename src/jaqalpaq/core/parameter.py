@@ -41,21 +41,30 @@ class AnnotatedValue:
 
     :param str name: The name the AnnotatedValue is labeled with.
     :param kind: Optionally, an annotation denoting the the type of the value. If None, can hold a value of any type (like a macro parameter).
+    :param variadic: True if this parameter may accept multiple arguments.
     """
 
-    def __init__(self, name, kind):
+    def __init__(self, name, kind, variadic=False):
         self._name = name
         self._kind = ParamType.make(kind)
+        self._variadic = bool(variadic)
 
     def __hash__(self):
         return hash((self.__class__, self._name, self._kind))
 
     def __repr__(self):
-        return f"Parameter({repr(self.name)}, {self.kind})"
+        if self._variadic:
+            return f"Parameter({repr(self.name)}, {self.kind}, variadic=True)"
+        else:
+            return f"Parameter({repr(self.name)}, {self.kind})"
 
     def __eq__(self, other):
         try:
-            return self.name == other.name and self.kind == other.kind
+            return (
+                self.name == other.name
+                and self.kind == other.kind
+                and self.variadic == other.variadic
+            )
         except AttributeError:
             return False
 
@@ -72,6 +81,13 @@ class AnnotatedValue:
         Optionally, an annotation denoting the type of the value.
         """
         return self._kind
+
+    @property
+    def variadic(self):
+        """
+        True if this parameter may accept multiple arguments.
+        """
+        return self._variadic
 
     def resolve_value(self, context=None):
         """
@@ -128,6 +144,15 @@ class Parameter(AnnotatedValue):
         :param value: The candidate value to validate.
         :raises JaqalError: If the value is not acceptable for this Parameter.
         """
+        if isinstance(value, list):
+            for item in value:
+                self._validate_single_value(item)
+        else:
+            self._validate_single_value(value)
+
+    def _validate_single_value(self, value):
+        """Check a single value for correctness."""
+
         from .register import NamedQubit, Register
 
         if self.kind == ParamType.QUBIT:

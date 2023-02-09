@@ -4,7 +4,6 @@ from jaqalpaq.error import JaqalError
 from jaqalpaq.core.parameter import ParamType, Parameter
 from jaqalpaq.core.constant import Constant
 
-
 from jaqalpaq.core.register import Register, NamedQubit
 from . import common
 from .randomize import random_float, random_integer
@@ -36,6 +35,24 @@ class ParameterTester(unittest.TestCase):
             )
             self.assertEqual(name, param.name)
             self.assertEqual(kind, param.kind)
+
+    def test_variadic_representation(self):
+        """Test that the variadic repr of a Parameter differs from the non-variadic."""
+        # Create a random parameter and store its repr string
+        param = common.make_random_parameter()
+        rep = repr(param)
+
+        # Make a copy to make sure we're doing the representation
+        # correctly as a control
+        cparam = Parameter(param.name, param.kind, variadic=param.variadic)
+        crep = repr(param)
+
+        # Do a copy but switch up whether it's variadic
+        vparam = Parameter(param.name, param.kind, variadic=not param.variadic)
+        vrep = repr(vparam)
+
+        self.assertNotEqual(vrep, rep)
+        self.assertEqual(crep, rep)
 
     def test_validate(self):
         """Test if the validate method returns True for valid values and False for
