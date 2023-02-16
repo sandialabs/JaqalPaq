@@ -110,6 +110,7 @@ class SubcircuitMaker(Visitor):
             new_circuit.registers.update(circuit.registers)
             body, _ = self.visit(circuit.body)
             new_circuit.body.statements.extend(body.statements)
+            new_circuit.usepulses.extend(circuit.usepulses)
             return new_circuit
         finally:
             self._macros = None
