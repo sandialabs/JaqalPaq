@@ -31,6 +31,12 @@ class MakeSubcircuitsTester(unittest.TestCase):
         exp = "{ foo; < bar | baz > }"
         self.run_test(text, exp)
 
+    def test_noop_with_usepulses(self):
+        """Regression test since an old version didn't copy usepulses."""
+        text = "from qscout.v1.std usepulses *"
+        exp = "from qscout.v1.std usepulses *"
+        self.run_test(text, exp)
+
     def test_top_level(self):
         """Test at top level with no other gates."""
         text = "prepare_all; measure_all"
