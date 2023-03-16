@@ -26,6 +26,48 @@ assert CUTOFF_WARN <= CUTOFF_FAIL
 assert CUTOFF_ZERO <= CUTOFF_WARN
 
 
+class Acceptor:
+    __slots__ = ("done", "_coroutine")
+
+    def __init__(self, *args, **kwargs):
+        # Hide the actual function inside a tuple to avoid munging it
+        self._coroutine = self._func[0](self._instance, *args, **kwargs)
+        try:
+            self._coroutine.send(None)
+        except StopIteration:
+            # This happens if the circuit is empty.
+            self.done = True
+        else:
+            self.done = False
+
+    def pass_data(self, data):
+        for datum in data:
+            try:
+                self._coroutine.send(datum)
+            except StopIteration:
+                if self.done:
+                    raise JaqalError("Coroutine ended early")
+                self.done = True
+
+    def pass_datum(self, datum):
+        self.pass_data((datum,))
+
+
+class acceptor:
+    __slots__ = ("func",)
+
+    def __init__(self, func):
+        self.func = func
+
+    def __get__(self, instance, owner=None):
+        func = self.func
+        return type(
+            func.__name__,
+            (Acceptor,),
+            dict(__slots__=(), _instance=instance, _func=(func,)),
+        )
+
+
 def parse_jaqal_output_list(circuit, output, overrides=None):
     """Parse experimental output into an :class:`ExecutionResult` providing collated and
     uncollated access to the output.
@@ -38,49 +80,23 @@ def parse_jaqal_output_list(circuit, output, overrides=None):
     :returns: The parsed output.
     :rtype: ExecutionResult
     """
-    circuit = expand_macros(fill_in_let(circuit))
+    exe_res = ExecutionResult(expand_macros(circuit), overrides)
 
-    subcircuits = []
-    for n, (sc, sc_end) in enumerate(discover_subcircuits(circuit)):
-        subcircuit = SubcircuitResult(n, sc, sc_end, circuit)
-        subcircuit.reset_readouts()
-        subcircuits.append(subcircuit)
+    parser = exe_res.accept_readouts()
 
-    res = []
-    breaks = [t._start for t in subcircuits]
+    readout_i = 0
+    for datum in output:
+        if isinstance(datum, str):
+            datum = int(datum[::-1], 2)
+        readout = Readout(datum, readout_i, None)
+        readout_i += 1
 
-    def _emit_readouts():
-        data = iter(output)
-        readout_index = 0
-        while True:
-            try:
-                nxt = next(data)
-            except StopIteration:
-                return
-            if isinstance(nxt, str):
-                nxt = int(nxt[::-1], 2)
-            mr = Readout(nxt, readout_index, None)
-            readout_index += 1
-            res.append(mr)
-            yield mr
+        parser.pass_datum(readout)
 
-    emitter = _emit_readouts()
+    if not parser.done:
+        raise JaqalError("Too many readouts passed to ExecutionResults.")
 
-    for readout_index, index in enumerate(walk_circuit(circuit, breaks)):
-        subcircuit = subcircuits[index]
-        try:
-            subcircuit.accept_readouts(emitter)
-        except StopIteration:
-            raise JaqalError("Unable to parse output: too few values")
-
-    try:
-        next(emitter)
-    except StopIteration:
-        pass
-    else:
-        raise JaqalError("Unable to parse output: too many values")
-
-    return ExecutionResult(circuit, subcircuits, overrides, res)
+    return exe_res
 
 
 class ExecutionResult:
@@ -155,6 +171,61 @@ class ExecutionResult:
 
         def __len__(self):
             return len(self._classical_cursor.by_time)
+
+    @acceptor
+    def accept_readouts(self):
+        for sb in self._subcircuits:
+            for sc in sb.values():
+                sc._reset_normalized_counts()
+
+        readout_i = 0
+        assert self._attributes.get("readouts", None) is None
+        readouts = self._attributes["readouts"] = []
+        for sb in self.by_subbatch:
+            readouts_for_sb = {}
+            readouts.append(readouts_for_sb)
+            for ci in sb.by_time:
+                sc = ci._subcircuit
+                readouts_for_subcirc = readouts_for_sb.get(sc.index, None)
+                if readouts_for_subcirc is None:
+                    readouts_for_subcirc = readouts_for_sb[sc.index] = []
+                for _ in range(ci.shots):
+                    subcirc_accept = sc.accept_readouts(ci._ci.per_sc_time_i)
+                    while not subcirc_accept.done:
+                        readout = yield
+                        subcirc_accept.pass_datum(readout)
+                        readouts_for_subcirc.append(readout)
+
+            for subcirc in sb.by_subcircuit:
+                subcirc._subcircuit.normalize_counts()
+
+    @acceptor
+    def accept_normalized_counts(self):
+        for sb in self._subcircuits:
+            for sc in sb.values():
+                sc._reset_normalized_counts()
+                sc._tree.normalized_count[:] = 1
+
+        assert self._attributes.get("normalized_count", None) is None
+        freqs = self._attributes["normalized_count"] = []
+        for sb in self.by_subbatch:
+            freqs_for_sb = {}
+            freqs.append(freqs_for_sb)
+            for ci in sb.by_time:
+                sc_i = ci.subcircuit_i
+                freqs_for_subcirc = freqs_for_sb.get(sc_i, None)
+                if freqs_for_subcirc is None:
+                    freqs_for_subcirc = freqs_for_sb[sc_i] = []
+                subcirc_accept = ci._subcircuit.accept_normalized_counts(
+                    ci._ci.per_sc_time_i
+                )
+                while not subcirc_accept.done:
+                    freq = yield
+                    subcirc_accept.pass_datum(freq)
+                    freqs_for_subcirc.append(freq)
+
+            for sc in sb.by_subcircuit:
+                sc._subcircuit._prepare_actions = []
 
 
 class SubbatchView:
@@ -572,6 +643,27 @@ class SubcircuitResult:
     def _reset_normalized_counts(self):
         update_tree(self._prepare_normalized_count, self._tree)
         self._prepare_actions = [self._prepare_normalized_count]
+
+    @acceptor
+    def accept_readouts(self, time_i):
+        assert self._prepare_actions
+        node = self._tree
+        node.normalized_count[time_i] += 1
+        while not node.classical_state.state == State.shutdown:
+            readout = yield
+            readout._subcircuit = self
+            readout._node = node
+            node = node.force_get(readout.as_int)
+            node.normalized_count[time_i] += 1
+
+    @acceptor
+    def accept_normalized_counts(self, time_i):
+        assert self._prepare_actions
+        data = yield
+        for meas_as_int, nc in enumerate(data):
+            node = self._tree.force_get(meas_as_int)
+            assert node.classical_state.state == State.shutdown
+            node.normalized_count[time_i] += nc
 
 
 class BackwardsCompatibleView:
