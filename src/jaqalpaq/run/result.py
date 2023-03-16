@@ -327,7 +327,6 @@ class SubcircuitResult:
 
     @property
     def index(self):
-        """The :term:`flat order` index of this object in the (unrolled) parent circuit."""
         return self._index
 
     @property
