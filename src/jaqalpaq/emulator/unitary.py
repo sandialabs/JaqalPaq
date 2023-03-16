@@ -155,6 +155,6 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
                 raise NotImplementedError()
 
         tree = handle_unitary(cursor, vec)
-        ret = result.Subcircuit(index, start, end, circ, tree=tree)
+        ret = result.SubcircuitResult(index, start, end, circ, tree=tree)
 
         return ret

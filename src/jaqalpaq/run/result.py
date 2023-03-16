@@ -40,7 +40,7 @@ def parse_jaqal_output_list(circuit, output, overrides=None):
 
     subcircuits = []
     for n, (sc, sc_end) in enumerate(discover_subcircuits(circuit)):
-        subcircuit = Subcircuit(n, sc, sc_end, circuit)
+        subcircuit = SubcircuitResult(n, sc, sc_end, circuit)
         subcircuit.reset_readouts()
         subcircuits.append(subcircuit)
 
@@ -304,8 +304,8 @@ def update_tree(update_node, tree):
     _inner(tree)
 
 
-class Subcircuit:
-    """Encapsulate one part of the circuit between a prepare_all and measure_all gate."""
+class SubcircuitResult:
+    """(internal) Encapsulate results from the part of a circuit between a prepare_all and measure_all gate."""
 
     def __init__(self, index, start, end, circuit, *, tree=None):
         """(internal) Instantiate a Subcircuit"""

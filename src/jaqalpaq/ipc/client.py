@@ -103,7 +103,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         subcircs = []
 
         for n, (start, end) in enumerate(discover_subcircuits(circ)):
-            subcirc = result.Subcircuit(n, start, end, circ)
+            subcirc = result.SubcircuitResult(n, start, end, circ)
             subcircs.append(subcirc)
 
             for k, nc in enumerate(freqs[n]):
