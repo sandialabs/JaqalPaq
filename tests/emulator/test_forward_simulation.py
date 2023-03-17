@@ -46,6 +46,21 @@ class ForwardSimulatorTester(unittest.TestCase):
             inject_pulses=jaqal_gates.ALL_GATES,
         )
 
+    def check_subcircuit_readouts(self, results, subcircuit_i, true_output):
+        true_int_output = [int(s[::-1], 2) for s in true_output]
+
+        sc = results.subcircuits[subcircuit_i]
+        int_output = [o.as_int for o in sc.readouts]
+        output = [o.as_str for o in sc.readouts]
+        self.assertEqual(int_output, true_int_output)
+        self.assertEqual(output, true_output)
+
+        true_total_prob = np.zeros(len(sc.relative_frequency_by_int))
+        for n, val in enumerate(true_int_output):
+            true_total_prob[val] += 1
+        true_total_prob /= len(true_output)
+        assert np.allclose(true_total_prob, sc.relative_frequency_by_int)
+
     def test_generate_jaqal_program(self):
         self.assertEqual(
             "\n".join([p for p in self.jaqal_string.split("\n")]),
@@ -310,20 +325,9 @@ measure_all
         self.assertEqual(output, true_output)
         self.assertEqual(int_output, true_int_output)
 
-        int_output = [o.as_int for o in results.subcircuits[0].readouts]
-        output = [o.as_str for o in results.subcircuits[0].readouts]
-        self.assertEqual(int_output, [1, 1])
-        self.assertEqual(output, ["100", "100"])
-
-        int_output = [o.as_int for o in results.subcircuits[1].readouts]
-        output = [o.as_str for o in results.subcircuits[1].readouts]
-        self.assertEqual(int_output, [2, 2, 2, 2])
-        self.assertEqual(output, ["010", "010", "010", "010"])
-
-        int_output = [o.as_int for o in results.subcircuits[2].readouts]
-        output = [o.as_str for o in results.subcircuits[2].readouts]
-        self.assertEqual(int_output, [4])
-        self.assertEqual(output, ["001"])
+        self.check_subcircuit_readouts(results, 0, ["100", "100"])
+        self.check_subcircuit_readouts(results, 1, ["010", "010", "010", "010"])
+        self.check_subcircuit_readouts(results, 2, ["001"])
 
     def test_spec_pi_fracs(self):
         jaqal_str = """
