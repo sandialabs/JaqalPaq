@@ -12,8 +12,8 @@ from jaqalpaq.core.algorithm.visitor import Visitor
 from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
 from jaqalpaq.core.locus import Locus
 from jaqalpaq.error import JaqalError
-from jaqalpaq.run.cursor import SubcircuitCursor, State
-from .cursor import SubcircuitCursor
+from ._view import Accessor, ArrayAccessor, cachedproperty
+from .cursor import SubcircuitCursor, State
 from .classical_cursor import ClassicalCursor
 
 
@@ -135,6 +135,70 @@ class ExecutionResult:
     @property
     def subcircuits_loci(self):
         return self._subcircuits_loci
+
+    class by_subbatch(ArrayAccessor):
+        @ArrayAccessor.getitem
+        def __getitem__(self, subbatch_i):
+            return SubbatchView(self, subbatch_i)
+
+        def __len__(self):
+            return len(self._subcircuits)
+
+    class by_time(ArrayAccessor):
+        @ArrayAccessor.getitem
+        def __getitem__(self, time_i):
+            cc = self._classical_cursor
+            sb_i, per_sb_time_i = cc.get_sb_i_from_time_i(time_i)
+            return CircuitIndexView(
+                self, cc.by_subbatch[sb_i].by_time[per_sb_time_i], time_i=time_i
+            )
+
+        def __len__(self):
+            return len(self._classical_cursor.by_time)
+
+
+class SubbatchView:
+    def __init__(self, result, subbatch_i):
+        self.result = result
+        self.index = subbatch_i
+
+    class by_subcircuit(Accessor):
+        def __getitem__(self, subcircuit_i):
+            return SubcircuitView(
+                self.result, self.result._subcircuits[self.index][subcircuit_i]
+            )
+
+        def __len__(self):
+            return len(self.result._subcircuits[self.index])
+
+        def keys(self):
+            return self.result._subcircuits[self.index].values()
+
+        @Accessor.direct
+        def __iter__(self):
+            for sc_i in self.keys():
+                yield SubcircuitView(self.instance.result, sc_i)
+
+    class by_time(ArrayAccessor):
+        @ArrayAccessor.getitem
+        def __getitem__(self, per_sb_time_i):
+            cc = self.result._classical_cursor
+            return CircuitIndexView(
+                self.result, cc.by_subbatch[self.index].by_time[per_sb_time_i]
+            )
+
+        def __len__(self):
+            return len(self.result._classical_cursor.by_subbatch[self.index].by_time)
+
+    def _repr_pretty_(self, printer, cycle=False):
+        printer.text(f"<Subbatch {self.index}/{len(self.result._subcircuits)} of ")
+        printer.pretty(self.result)
+        printer.text(">")
+
+    def __repr__(self):
+        return (
+            f"<Subbatch {self.index}/{len(self.result._subcircuits)} of {self.result}>"
+        )
 
 
 class Readout:
@@ -258,6 +322,144 @@ class TreeAccessDefault(JaqalError):
     pass
 
 
+class AbstractTreeAccessor(Accessor):
+    __slots__ = ("_prefix", "_target")
+
+    def __init__(self, instance, owner=None, *, target=None, prefix=()):
+        self._prefix = prefix
+        Accessor.__init__(self, instance, owner=owner)
+
+    def _func(self, index):
+        raise NotImplementedError()
+
+    @Accessor.direct
+    def _getattr(self, node):
+        return getattr(node, self.attrname)
+
+    @Accessor.direct
+    def walk(self, index):
+        return ReadoutTreeNode.deref(
+            self.instance._subcircuit._tree, self._prefix + index
+        )
+
+    @Accessor.direct
+    def __getitem__(self, index):
+        if not isinstance(index, tuple):
+            index = (index,)
+
+        sliced = False
+        for i in index:
+            if sliced:
+                raise TypeError(
+                    "JaqalPaq: Slices are only supported on the final index"
+                )
+            if isinstance(i, slice):
+                sliced = True
+
+        if not sliced:
+            return self._func(index)
+
+        if len(index) == 1:
+            return self
+
+        return self.add_to_prefix(index[:-1])
+
+    @Accessor.direct
+    def add_to_prefix(self, extend):
+        return type(self)(self.instance, prefix=self._prefix + extend)
+
+    @Accessor.direct
+    @property
+    def by_int(self):
+        return self
+
+    @Accessor.direct
+    @property
+    def by_str(self):
+        return {f"{k:b}".zfill(self.target.bits)[::-1]: v for k, v in self.items()}
+
+    @Accessor.direct
+    @property
+    def by_int_dense(self):
+        # Don't require numpy in the experiment
+        import numpy
+
+        bits = self.target.bits
+        return numpy.array([self[k] for k in range(1 << bits)])
+
+    @Accessor.direct
+    @property
+    def by_str_dense(self):
+        bits = self.target.bits
+        ret = {}
+        for k in range(1 << bits):
+            ret[f"{k:b}".zfill(self.target.bits)[::-1]] = self[k]
+        return ret
+
+    @Accessor.direct
+    @property
+    def target(self):
+        try:
+            return self._target
+        except AttributeError:
+            pass
+
+        for _, value in ReadoutTreeNode.deref(
+            self.instance._subcircuit._tree, self._prefix
+        ):
+            pass
+
+        self._target = value
+        return value
+
+    @Accessor.direct
+    def __iter__(self):
+        return iter(self.target.subsequent.keys())
+
+    @Accessor.direct
+    def items(self):
+        target = self.target
+        for k in target.subsequent.keys():
+            yield k, self[k]
+
+    @Accessor.direct
+    def __repr__(self):
+        ret = ["Tree{"]
+        first = True
+        for k, v in self.items():
+            if first:
+                first = False
+            else:
+                ret.append(", ")
+            ret.append(f"{k:b}".zfill(self.target.bits)[::-1])
+            ret.append(f": {v}")
+        ret.append("}")
+        return "".join(ret)
+
+
+class CumulativeTreeAccessor(AbstractTreeAccessor):
+    @Accessor.direct
+    def _func(self, index):
+        ret = self.start
+        try:
+            for _, node in self.walk(index):
+                ret = self.reduce(ret, self._getattr(node))
+        except TreeAccessDefault:
+            return self.default
+        return ret
+
+
+class TreeAccessor(AbstractTreeAccessor):
+    @Accessor.direct
+    def _func(self, index):
+        try:
+            for _, final in self.walk(index):
+                continue
+        except TreeAccessDefault:
+            return self.default
+        return self._getattr(final)
+
+
 def update_tree(update_node, tree):
     def _inner(node):
         if node.subsequent:
@@ -370,6 +572,242 @@ class SubcircuitResult:
     def _reset_normalized_counts(self):
         update_tree(self._prepare_normalized_count, self._tree)
         self._prepare_actions = [self._prepare_normalized_count]
+
+
+class SubcircuitView:
+    def __init__(self, result, subcircuit):
+        self._subcircuit = subcircuit
+        self.result = result
+
+    class by_time(ArrayAccessor):
+        @ArrayAccessor.getitem
+        def __getitem__(self, per_sc_time_i):
+            cc = self.result._classical_cursor
+            return CircuitIndexView(
+                self.result,
+                cc.by_subbatch[self.subbatch.index]
+                .by_subcircuit[self.index]
+                .by_time[per_sc_time_i],
+            )
+
+        def __len__(self):
+            cc = self.result._classical_cursor
+            return len(cc.by_subbatch[self.subbatch_i].by_subcircuit[self.index])
+
+    def _repr_pretty_(self, printer, cycle=False):
+        sc = self._subcircuit
+        printer.text(f"<SubcircuitView {sc._index}@{sc._start} of ")
+        printer.pretty(sc.circuit)
+        printer.text(">")
+
+    def __repr__(self):
+        sc = self._subcircuit
+        return f"SubcircuitView {sc._index}@{sc._start} of {sc.circuit}>"
+
+    @property
+    def index(self):
+        return self._subcircuit.index
+
+    @property
+    def subbatch_i(self):
+        return self._subcircuit.subbatch_i
+
+    @property
+    def subbatch(self):
+        return self.result.by_subbatch[self.subbatch_i]
+
+    def __getattr__(self, attribute):
+        try:
+            attr = self.result._attributes[attribute]
+        except KeyError:
+            raise AttributeError(
+                f"JaqalPaq: '{type(self).__name__}' object has no attribute '{attribute}'"
+            )
+        return AttributeView(self._subcircuit, attribute, attr)
+
+    def __dir__(self):
+        yield from super().__dir__()
+        yield from self.result._attributes.keys()
+
+    @property
+    def num_repeats(self):
+        return self._subcircuit._tree.num_repeats
+
+    class simulated_probabilities(CumulativeTreeAccessor):
+        attrname = "simulated_probability"
+        default = 0.0
+        start = 1.0
+
+        def reduce(self, cur, nxt):
+            return cur * nxt
+
+    class conditional_simulated_probabilities(TreeAccessor):
+        attrname = "simulated_probability"
+        default = 0.0
+
+    class normalized_counts(CumulativeTreeAccessor):
+        attrname = "normalized_count"
+
+        @property
+        def default(self):
+            return self._subcircuit._result_array()
+
+        @property
+        def start(self):
+            ret = self._subcircuit._result_array()
+            ret[:] = 1
+            return ret
+
+        def reduce(self, cur, nxt):
+            return cur * nxt
+
+        class by_time(ArrayAccessor):
+            def __len__(self):
+                return len(self.instance.by_time)
+
+            @ArrayAccessor.getitem
+            def __getitem__(self, i):
+                return self.instance.by_time[i].normalized_counts
+
+    class conditional_normalized_counts(TreeAccessor):
+        attrname = "normalized_count"
+        default = 0.0
+
+        class by_time(ArrayAccessor):
+            def __len__(self):
+                return len(self.instance.by_time)
+
+            @ArrayAccessor.getitem
+            def __getitem__(self, i):
+                return self.instance.by_time[i].conditional_normalized_counts
+
+
+class AttributeView:
+    __slots__ = ("attribute", "attribute_name", "_subcircuit")
+
+    def __init__(self, subcircuit, attribute_name, attribute):
+        self._subcircuit = subcircuit
+        self.attribute_name = attribute_name
+        self.attribute = attribute
+
+    class by_time(Accessor):
+        def __getitem__(self, time_i):
+            sc = self._subcircuit
+            return self.attribute[sc.subbatch_i][sc._index][time_i]
+
+        def __len__(self):
+            sc = self._subcircuit
+            return len(self.attribute[sc.subbatch_i][sc._index])
+
+        def __iter__(self):
+            sc = self._subcircuit
+            yield from self.attribute[sc.subbatch_i][sc._index]
+
+
+class CITreeAccessor(AbstractTreeAccessor):
+    @Accessor.direct
+    def _getattr(self, node):
+        return getattr(node, self.attrname)[self.instance.per_subcircuit_time_index]
+
+
+class CircuitIndexView:
+    def __init__(self, result, circuitindex, *, time_i=None):
+        self.result = result
+        self._ci = circuitindex
+        sb_i = circuitindex.subbatch.index
+        sc_i = circuitindex.subcircuit_i
+        self._subcircuit = result._subcircuits[sb_i][sc_i]
+        if time_i is not None:
+            self.__dict__["time_i"] = time_i
+
+    def _repr_pretty_(self, printer, cycle=False):
+        ci = self._ci
+        printer.text(
+            f"<CircuitIndexView {ci.subbatch.index}/{ci.subcircuit_i}:{self.per_subcircuit_time_index} ({self.time_i}) of "
+        )
+        printer.pretty(self.result)
+        printer.text(">")
+
+    def __repr__(self):
+        ci = self._ci
+        return f"<CircuitIndexView {ci.subbatch.index}/{ci.subcircuit_i}:{self.per_subcircuit_time_index} ({self.time_i}) of {self.result}>"
+
+    def __getattr__(self, attribute):
+        ci = self._ci
+        try:
+            attr = self.result._attributes[attribute]
+        except KeyError:
+            raise AttributeError(
+                f"JaqalPaq: '{type(self).__name__}' object has no attribute '{attribute}'"
+            )
+
+        return attr[ci.subbatch.index][ci.subcircuit_i][ci.per_sc_time_i]
+
+    def __dir__(self):
+        yield from super().__dir__()
+        yield from self.result._attributes.keys()
+
+    @property
+    def shots(self):
+        shots = self._ci.subbatch.get_override("__repeats__")
+        if shots is not None:
+            return shots
+
+        start_obj = self._subcircuit._start.object
+        if isinstance(start_obj, BlockStatement):
+            assert start_obj.subcircuit
+            shots = start_obj.iterations
+        else:
+            # This global setting does not reflect the typical behavior of
+            # QSCOUT hardware, which is by default much closer to 100
+            # repeats.  Changing it here, however, breaks API, so we will
+            # wait until 2.0 to set this to a more reasonable default.
+            # You can control this by setting the __repeats__ override.
+            shots = 1
+        return shots
+
+    @property
+    def subcircuit(self):
+        return SubcircuitView(self.result, self._subcircuit)
+
+    @property
+    def subcircuit_i(self):
+        return self._ci.subcircuit_i
+
+    @property
+    def num_repeats(self):
+        return self._subcircuit._tree.num_repeats[self._ci.per_sc_time_i]
+
+    class simulated_probabilities(CITreeAccessor):
+        def _func(self, index):
+            return self.subcircuit.simulated_probabilities[index]
+
+    class conditional_simulated_probabilities(CITreeAccessor):
+        def _func(self, index):
+            return self.subcircuit.conditional_simulated_probabilities[index]
+
+    class normalized_counts(CumulativeTreeAccessor, CITreeAccessor):
+        attrname = "normalized_count"
+        default = 0.0
+        start = 1.0
+
+        def reduce(self, cur, nxt):
+            return cur * nxt
+
+    class conditional_normalized_counts(TreeAccessor, CITreeAccessor):
+        attrname = "normalized_count"
+        default = 0.0
+
+    @cachedproperty
+    def per_subcircuit_time_index(self):
+        ci = self._ci
+        return self.result._classical_cursor.get_per_sc_time_i(
+            ci.subbatch.index, ci.subcircuit_i, ci.per_sb_time_i
+        )
+
+    @cachedproperty
+    def time_i(self):
+        return self._ci.time_i
 
 
 def validate_probabilities(probabilities):
