@@ -41,8 +41,8 @@ def ipc_protocol_parse(resp_text):
 def ipc_protocol_write(conn, exe_res):
     results = []
 
-    for subcirc in exe_res.subcircuits:
-        results.append(list(subcirc.probability_by_int))
+    for exp in exe_res.by_time:
+        results.append(list(exp.normalized_counts.by_int_dense))
 
     return conn.send(json.dumps(results).encode())
 

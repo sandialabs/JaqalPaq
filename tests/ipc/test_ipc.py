@@ -40,5 +40,9 @@ class IPCTester(unittest.TestCase):
         exe = self.run_jaqal(circ)
 
         sc0, sc1 = exe.subcircuits
-        assert numpy.allclose(sc0.relative_frequency_by_int, [0, 1 / 2, 1 / 2, 0])
+        assert numpy.allclose(sc0.relative_frequency_by_int, [0, 0, 1, 0])
         assert numpy.allclose(sc1.relative_frequency_by_int, [1, 0, 0, 0])
+
+        ci0, ci1 = exe.by_time
+        assert numpy.allclose(ci0.total_relative_frequency.by_int_dense, [0, 0, 1, 0])
+        assert numpy.allclose(ci1.total_relative_frequency.by_int_dense, [1, 0, 0, 0])

@@ -11,7 +11,6 @@ import socket, select
 import json
 
 from jaqalpaq.error import JaqalError
-from jaqalpaq.core.algorithm.walkers import discover_subcircuits
 from jaqalpaq.generator import generate_jaqal_program
 
 from jaqalpaq.run import result
@@ -98,19 +97,14 @@ class IPCBackend(IndependentSubcircuitsBackend):
 
     def _execute_job(self, job):
         circ = job.expanded_circuit
+        exe_res = result.ExecutionResult(circ, job.overrides)
+
         freqs = self._ipc_protocol(circ)
-        n_qubits = self.get_n_qubits(circ)
-        subcircs = []
+        parser = exe_res.accept_normalized_counts()
 
-        for n, (start, end) in enumerate(discover_subcircuits(circ)):
-            subcirc = result.SubcircuitResult(n, start, end, circ)
-            subcircs.append(subcirc)
+        parser.pass_data(freqs)
 
-            for k, nc in enumerate(freqs[n]):
-                nxt_node = subcirc._tree.force_get(k)
-                nxt_node.normalized_count = nc
+        if not parser.done:
+            raise JaqalError("Unable to parse output: not enough values")
 
-        if n + 1 < len(freqs):
-            raise JaqalError("Unable to parse output: too many values")
-
-        return result.ExecutionResult(circ, subcircs, job.overrides, None)
+        return exe_res
