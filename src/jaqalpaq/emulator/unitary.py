@@ -82,19 +82,19 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
     This object should be treated as an opaque symbol to be passed to run_jaqal_circuit.
     """
 
-    def _make_subcircuit(self, circ, index, start, end):
+    def _simulate_subcircuit(self, job, subcirc):
         """Generate the ProbabilisticSubcircuit associated with the trace of circuit
             being process in job.
 
         :param job: the job object controlling the emulation
         :param int index: the index of the trace in the circuit
         :param Trace trace: the trace of the subcircuit
-        :return: A ProbabilisticSubcircuit.
         """
+        circ = subcirc.filled_circuit
         gatedefs = circ.native_gates
 
         # fill_in_let modified the circuit here
-        cursor = SubcircuitCursor(start, end)
+        cursor = SubcircuitCursor(subcirc.start, subcirc.end)
 
         n_qubits = self.get_n_qubits(circ)
 
@@ -104,8 +104,7 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
         vec = numpy.zeros(hilb_dim, dtype=complex)
         vec[0] = 1
 
-        def handle_final_measurement(cursor, vec):
-            subs = {}
+        def handle_final_measurement(cursor, vec, node):
             P = numpy.abs(vec) ** 2
             P = result.validate_probabilities(P)
             for i, prob in enumerate(P):
@@ -114,14 +113,13 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
                 meas_cursor = cursor.copy()
                 meas = meas_cursor.next_measure()
                 assert meas_cursor.state == State.shutdown
-                sub = result.ReadoutTreeNode(meas_cursor)
+                sub = node.force_get(i, meas_cursor)
+                assert sub.classical_state == meas_cursor
                 sub.simulated_probability = prob
-                subs[i] = sub
-            res = result.ReadoutTreeNode(cursor, subsequent=subs)
-            res.state_vector = vec
-            return res
+            assert node.classical_state == cursor
+            node.state_vector = vec
 
-        def handle_unitary(cursor, vec):
+        def handle_unitary(cursor, vec, node):
             # We don't need to initialize this yet.
             scratch = numpy.empty(hilb_dim, dtype=complex)
 
@@ -150,11 +148,8 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
                 vec, scratch = inplace_multiply(dsub, qind, vec, scratch)
 
             if cursor.state == State.final_measurement:
-                return handle_final_measurement(cursor, vec)
+                handle_final_measurement(cursor, vec, node)
             else:
                 raise NotImplementedError()
 
-        tree = handle_unitary(cursor, vec)
-        ret = result.SubcircuitResult(index, start, end, circ, tree=tree)
-
-        return ret
+        handle_unitary(cursor, vec, subcirc._tree)

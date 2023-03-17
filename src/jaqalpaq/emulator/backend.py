@@ -5,6 +5,7 @@ import abc
 
 from numpy.random import choice
 
+from jaqalpaq.error import JaqalError
 from jaqalpaq.core.locus import Locus
 from jaqalpaq.core.block import BlockStatement
 from jaqalpaq.core.algorithm.walkers import walk_circuit, discover_subcircuits
@@ -101,50 +102,47 @@ class ExtensibleBackend(AbstractBackend):
 class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     """Abstract emulator backend for subcircuits that are independent"""
 
+    def simulate_subcircuit(self, job, subcircuit):
+        self._simulate_subcircuit(job, subcircuit)
+        subcircuit._simulated = True
+        subcircuit._tree.simulated_probability = 1
+
     @abc.abstractmethod
+    def _simulate_subcircuit(self, job, subcircuit):
+        """(internal) Populate a subcircuit object with simulated data
+        :param JaqalJob job: The job, describing the circuit and overrides
+        :param SubcircuitResult subcirc: Data-carrying object of ExecutionResulsts
+        """
+        raise NotImplementedError()
 
-    def _make_subcircuit(self, circ, index, start, end):
-        """(internal) Produce a subcircuit given a trace"""
-
-    def _make_readouts(self, subcircuit, results):
-        def _make_all_readouts():
+    def _simulate_ci(self, ci, job):
+        subcircuit = ci._subcircuit
+        for _ in range(ci.shots):
             node = subcircuit._tree
             while not node.classical_state.state == cursor.State.shutdown:
                 keys = list(node.subsequent.keys())
                 p = [node.subsequent[k].simulated_probability for k in keys]
                 nxt = choice(keys, p=p)
-                mr = result.Readout(nxt, len(results), node)
-                results.append(mr)
+                mr = result.Readout(nxt, job.meas_count, node)
                 yield mr
+                job.meas_count += 1
                 node = node[nxt]
-
-        subcircuit.accept_readouts(_make_all_readouts())
 
     def _execute_job(self, job):
         """(internal) Execute the job on the backend"""
-        circ = fill_in_let(job.expanded_circuit)
-        subcircs = []
-        for n, (start, end) in enumerate(discover_subcircuits(circ)):
-            subcirc = self._make_subcircuit(circ, n, start, end)
-            subcirc._simulated = True
-            subcirc.reset_readouts()
-            subcircs.append(subcirc)
-        results = []
 
-        for index in walk_circuit(circ, [t._start for t in subcircs]):
-            # The subcircuit directive is not handled separately from the block
-            # that it contains, so we handle it manually here.
-            subcirc = subcircs[index]
-            start_obj = subcirc._start.object
-            if isinstance(start_obj, BlockStatement):
-                assert start_obj.subcircuit
-                iterations = start_obj.iterations
-            else:
-                iterations = 1
-            for _ in range(iterations):
-                self._make_readouts(subcirc, results)
+        exe_res = result.ExecutionResult(job.expanded_circuit, job.overrides)
+        for sb in exe_res.by_subbatch:
+            for sc in sb.by_subcircuit:
+                self.simulate_subcircuit(job, sc._subcircuit)
 
-        for subcirc in subcircs:
-            subcirc.normalize_counts()
+        parser = exe_res.accept_readouts()
 
-        return result.ExecutionResult(circ, subcircs, job.overrides, results)
+        job.meas_count = 0
+        for ci in exe_res.by_time:
+            parser.pass_data(self._simulate_ci(ci, job))
+
+        if not parser.done:
+            raise JaqalError("Not enough readouts passed to ExecutionResults.")
+
+        return exe_res

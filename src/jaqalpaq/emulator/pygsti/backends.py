@@ -31,12 +31,11 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
         self.gate_durations = gate_durations if gate_durations is not None else {}
         super().__init__(*args, **kwargs)
 
-    def _make_subcircuit(self, circ, index, start, end):
-        """Generate the probabilities of outcomes of a subcircuit
+    def _simulate_subcircuit(self, job, subcirc):
+        start = subcirc.start
+        end = subcirc.end
+        circ = subcirc.filled_circuit
 
-        :param Trace trace: the subcircut of circ to generate probabilities for
-        :return: A pyGSTi outcome dictionary.
-        """
         cursor = SubcircuitCursor.terminal_cursor(end)
         trace = Trace(list(start.address), list(end.address))
 
@@ -54,22 +53,16 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
 
         p = result.validate_probabilities(probs)
 
-        tree = result.ReadoutTreeNode(cursor)
+        tree = subcirc._tree
         tree.simulated_density_matrix = rho
 
         for k, v in enumerate(p):
-            nxt_cursor = cursor.copy()
-            nxt_cursor.next_measure()
-            node = tree.subsequent[k] = result.ReadoutTreeNode(nxt_cursor)
+            node = tree.force_get(k)
             node.simulated_probability = v
 
-        ret = result.SubcircuitResult(index, start, end, circ, tree=tree)
-
         if KEEP_PYGSTI_OBJECTS:
-            ret._pygsti_circuit = pc
-            ret._pygsti_model = model
-
-        return ret
+            subcirc._pygsti_circuit = pc
+            subcirc._pygsti_model = model
 
 
 class AbstractNoisyNativeEmulator(backend.ExtensibleBackend, CircuitEmulator):

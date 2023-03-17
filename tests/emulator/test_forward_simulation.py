@@ -50,6 +50,7 @@ class ForwardSimulatorTester(unittest.TestCase):
         true_int_output = [int(s[::-1], 2) for s in true_output]
 
         sc = results.subcircuits[subcircuit_i]
+        sc_n = results.by_subbatch[0].by_subcircuit[subcircuit_i]
         int_output = [o.as_int for o in sc.readouts]
         output = [o.as_str for o in sc.readouts]
         self.assertEqual(int_output, true_int_output)
@@ -58,6 +59,10 @@ class ForwardSimulatorTester(unittest.TestCase):
         true_total_prob = np.zeros(len(sc.relative_frequency_by_int))
         for n, val in enumerate(true_int_output):
             true_total_prob[val] += 1
+            self.assertEqual(sc_n.by_time[n].normalized_counts.by_int[val], 1)
+            self.assertEqual(sc_n.normalized_counts.by_int[val][n], 1)
+            self.assertEqual(sc_n.by_time[n].readouts.as_int, val)
+            self.assertEqual(sc_n.readouts.by_time[n].as_int, val)
         true_total_prob /= len(true_output)
         assert np.allclose(true_total_prob, sc.relative_frequency_by_int)
 
@@ -106,15 +111,61 @@ subcircuit {
             "\n".join(("from qscout.v1.std usepulses *", jaqal_string))
         )
 
-        c_dict = res.subcircuits[0].probability_by_str
-        self.assertAlmostEqual(c_dict["000"], 0.5)
-        self.assertAlmostEqual(c_dict["001"], 0)
-        self.assertAlmostEqual(c_dict["010"], 0)
-        self.assertAlmostEqual(c_dict["011"], 0)
-        self.assertAlmostEqual(c_dict["100"], 0)
-        self.assertAlmostEqual(c_dict["101"], 0)
-        self.assertAlmostEqual(c_dict["110"], 0.5)
-        self.assertAlmostEqual(c_dict["111"], 0)
+        for c_dict in (
+            res.subcircuits[0].probability_by_str,
+            res.by_subbatch[0].by_time[0].simulated_probabilities,
+        ):
+            self.assertAlmostEqual(c_dict["000"], 0.5)
+            self.assertAlmostEqual(c_dict["001"], 0)
+            self.assertAlmostEqual(c_dict["010"], 0)
+            self.assertAlmostEqual(c_dict["011"], 0)
+            self.assertAlmostEqual(c_dict["100"], 0)
+            self.assertAlmostEqual(c_dict["101"], 0)
+            self.assertAlmostEqual(c_dict["110"], 0.5)
+            self.assertAlmostEqual(c_dict["111"], 0)
+
+    def test_emulate_subcircuit_shots(self):
+        jaqal_string = """let pi2 1.5707963267948966
+
+register q[3]
+
+subcircuit 10 {
+  MS q[1] q[0] pi2 pi2
+}
+"""
+        np.random.seed(0)
+        res = run_jaqal_string(
+            "\n".join(("from qscout.v1.std usepulses *", jaqal_string))
+        )
+
+        for c_dict in (
+            res.subcircuits[0].probability_by_str,
+            res.by_subbatch[0].by_time[0].simulated_probabilities,
+        ):
+            self.assertAlmostEqual(c_dict["000"], 0.5)
+            self.assertAlmostEqual(c_dict["001"], 0)
+            self.assertAlmostEqual(c_dict["010"], 0)
+            self.assertAlmostEqual(c_dict["011"], 0)
+            self.assertAlmostEqual(c_dict["100"], 0)
+            self.assertAlmostEqual(c_dict["101"], 0)
+            self.assertAlmostEqual(c_dict["110"], 0.5)
+            self.assertAlmostEqual(c_dict["111"], 0)
+
+        for c_dict in (
+            res.subcircuits[0].relative_frequency_by_str,
+            res.by_subbatch[0].by_time[0].normalized_counts,
+        ):
+            self.assertAlmostEqual(c_dict["000"], 0.3)
+            self.assertAlmostEqual(c_dict["001"], 0)
+            self.assertAlmostEqual(c_dict["010"], 0)
+            self.assertAlmostEqual(c_dict["011"], 0)
+            self.assertAlmostEqual(c_dict["100"], 0)
+            self.assertAlmostEqual(c_dict["101"], 0)
+            self.assertAlmostEqual(c_dict["110"], 0.7)
+            self.assertAlmostEqual(c_dict["111"], 0)
+
+        self.assertEqual(res.by_time[0].num_repeats, 10)
+        self.assertEqual(res.by_subbatch[0].by_subcircuit[0].num_repeats, [10])
 
     def test_five_qubit_GHZ(self):
         jaqal_text = """
