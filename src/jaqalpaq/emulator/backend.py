@@ -147,4 +147,4 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
         for subcirc in subcircs:
             subcirc.normalize_counts()
 
-        return result.ExecutionResult(subcircs, results)
+        return result.ExecutionResult(circ, subcircs, results)

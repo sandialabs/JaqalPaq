@@ -103,7 +103,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         subcircs = []
 
         for n, (start, end) in enumerate(discover_subcircuits(circ)):
-            subcirc = result.Subcircuit(n, start, end)
+            subcirc = result.Subcircuit(n, start, end, circ)
             subcircs.append(subcirc)
 
             for k, nc in enumerate(freqs[n]):
@@ -116,4 +116,4 @@ class IPCBackend(IndependentSubcircuitsBackend):
         if n + 1 < len(freqs):
             raise JaqalError("Unable to parse output: too many values")
 
-        return result.ExecutionResult(subcircs, None)
+        return result.ExecutionResult(circ, subcircs, None)

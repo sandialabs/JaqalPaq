@@ -63,7 +63,7 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
             node = tree.subsequent[k] = result.ReadoutTreeNode(nxt_cursor)
             node.simulated_probability = v
 
-        ret = result.Subcircuit(index, start, end, tree=tree)
+        ret = result.Subcircuit(index, start, end, circ, tree=tree)
 
         if KEEP_PYGSTI_OBJECTS:
             ret._pygsti_circuit = pc

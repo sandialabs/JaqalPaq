@@ -39,7 +39,7 @@ def parse_jaqal_output_list(circuit, output):
 
     subcircuits = []
     for n, (sc, sc_end) in enumerate(discover_subcircuits(circuit)):
-        subcircuit = Subcircuit(n, sc, sc_end)
+        subcircuit = Subcircuit(n, sc, sc_end, circuit)
         subcircuit.reset_readouts()
         subcircuits.append(subcircuit)
 
@@ -77,21 +77,23 @@ def parse_jaqal_output_list(circuit, output):
     else:
         raise JaqalError("Unable to parse output: too many values")
 
-    return ExecutionResult(subcircuits, res)
+    return ExecutionResult(circuit, subcircuits, res)
 
 
 class ExecutionResult:
     "Captures the results of a Jaqal program's execution, on hardware or an emulator."
 
-    def __init__(self, subcircuits, readouts=None):
+    def __init__(self, circuit, subcircuits, readouts=None):
         """(internal) Initializes an ExecutionResult object.
 
+        :param Circuit circuit:  The circuit for which these results will represent.
         :param list[Subcircuit] output:  The subcircuits bounded at the beginning by a
             prepare_all statement, and at the end by a measure_all statement.
         :param list[Readout] output:  The measurements made during the running of the
             Jaqal problem.
 
         """
+        self._circuit = circuit
         self._subcircuits = subcircuits
         self._readouts = readouts
 
@@ -287,13 +289,14 @@ def update_tree(update_node, tree):
 class Subcircuit:
     """Encapsulate one part of the circuit between a prepare_all and measure_all gate."""
 
-    def __init__(self, index, start, end, *, tree=None):
+    def __init__(self, index, start, end, circuit, *, tree=None):
         """(internal) Instantiate a Subcircuit"""
         self._start = start
         if isinstance(start.object, BlockStatement) and start.object.subcircuit:
             assert end == start
         self._end = end
         self._index = int(index)
+        self._circuit = circuit
         if tree is not None:
             self._tree = tree
             update_tree(lambda node: setattr(node, "_owner", self), self._tree)
@@ -308,6 +311,10 @@ class Subcircuit:
     def index(self):
         """The :term:`flat order` index of this object in the (unrolled) parent circuit."""
         return self._index
+
+    @property
+    def circuit(self):
+        return self._circuit
 
     @property
     def measured_qubits(self):
