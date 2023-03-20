@@ -173,6 +173,17 @@ class ExecutionResult:
 
         return lst
 
+    @cachedproperty
+    def subcircuits(self):
+        """(deprecated) An indexable, iterable view of the :class:`DeprecatedSubcircuitView`
+        objects in :term:`flat order`, containing the readouts due to that subcircuit, as well as
+        additional auxiliary data.
+
+        This interface is not compatible with batched results.
+        """
+        (sb,) = self._subcircuits
+        return [DeprecatedSubcircuitView(self, sc) for sc in sb.values()]
+
     class by_subbatch(ArrayAccessor):
         @ArrayAccessor.getitem
         def __getitem__(self, subbatch_i):
@@ -834,6 +845,26 @@ class SubcircuitView:
             @ArrayAccessor.getitem
             def __getitem__(self, i):
                 return self.instance.by_time[i].conditional_normalized_counts
+
+
+class DeprecatedSubcircuitView(SubcircuitView, BackwardsCompatibleView):
+    class _relative_frequencies(CumulativeTreeAccessor):
+        # The existing API collected all prior runs of the subcircuit and gave the
+        # relative frequency of all of those runs.
+        attrname = "normalized_count"
+        default = 0.0
+        start = 1.0
+
+        def reduce(self, cur, nxt):
+            (l,) = nxt.shape
+            return cur * nxt.sum() / l
+
+    @property
+    def readouts(self):
+        """An indexable, iterable view of :class:`Readout` objects, containing the
+        time-ordered measurements and auxiliary data."""
+        # Readouts came as an actual list
+        return self.result._attributes["readouts"][self.subbatch_i][self.index]
 
 
 class AttributeView:
