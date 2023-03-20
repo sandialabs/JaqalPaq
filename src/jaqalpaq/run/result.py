@@ -574,6 +574,47 @@ class SubcircuitResult:
         self._prepare_actions = [self._prepare_normalized_count]
 
 
+class BackwardsCompatibleView:
+    @property
+    def _probabilities(self):
+        if self._subcircuit._simulated:
+            return self.simulated_probabilities
+        else:
+            return self._relative_frequencies
+
+    @property
+    def probability_by_int(self):
+        return self._probabilities.by_int_dense
+
+    @property
+    def probability_by_str(self):
+        return self._probabilities.by_str_dense
+
+    @property
+    def simulated_probability_by_int(self):
+        return self.simulated_probabilities.by_int_dense
+
+    @property
+    def simulated_probability_by_str(self):
+        return self.simulated_probabilities.by_str_dense
+
+    @property
+    def relative_frequency_by_int(self):
+        return self._relative_frequencies.by_int_dense
+
+    @property
+    def relative_frequency_by_str(self):
+        return self._relative_frequencies.by_str_dense
+
+    @property
+    def _pygsti_circuit(self):
+        return self._subcircuit._pygsti_circuit
+
+    @property
+    def _pygsti_model(self):
+        return self._subcircuit._pygsti_model
+
+
 class SubcircuitView:
     def __init__(self, result, subcircuit):
         self._subcircuit = subcircuit
