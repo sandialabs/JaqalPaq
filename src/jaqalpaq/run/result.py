@@ -152,6 +152,27 @@ class ExecutionResult:
     def subcircuits_loci(self):
         return self._subcircuits_loci
 
+    @property
+    def readouts(self):
+        """An indexable, iterable view of :class:`Readout` objects, containing the
+        time-ordered measurements and auxiliary data."""
+        lst = []
+        for sb in self._classical_cursor.by_subbatch:
+            per_sb = {
+                k: iter(v) for k, v in self._attributes["readouts"][sb.index].items()
+            }
+            for ci in sb.by_time:
+                lst.append(next(per_sb[ci.subcircuit_i]))
+            for k, v in per_sb.items():
+                try:
+                    next(v)
+                except StopIteration:
+                    pass
+                else:
+                    raise JaqalError("Not all subcircuit processed!")
+
+        return lst
+
     class by_subbatch(ArrayAccessor):
         @ArrayAccessor.getitem
         def __getitem__(self, subbatch_i):
