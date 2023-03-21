@@ -7,7 +7,6 @@ from numpy import zeros
 
 from pygsti.protocols import ModelFreeformSimulator
 
-from jaqalpaq.core.algorithm.walkers import Trace
 from jaqalpaq.run.cursor import SubcircuitCursor, State
 from jaqalpaq.run import result
 from jaqalpaq.emulator import backend
@@ -36,11 +35,8 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
         end = subcirc.end
         circ = subcirc.filled_circuit
 
-        cursor = SubcircuitCursor.terminal_cursor(end)
-        trace = Trace(list(start.address), list(end.address))
-
         pc = pygsti_circuit_from_circuit(
-            circ, trace=trace, durations=self.gate_durations
+            circ, trace=(start, end), durations=self.gate_durations
         )
 
         model = self.model
