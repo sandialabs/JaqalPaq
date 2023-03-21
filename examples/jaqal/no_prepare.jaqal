@@ -5,4 +5,4 @@ register q[1]
 measure_all
 
 // EXPECTED ERROR
-// jaqalpaq.error.JaqalError: prepare_all must follow a measure_all
+// jaqalpaq.error.JaqalError: measure_all must follow a prepare_all

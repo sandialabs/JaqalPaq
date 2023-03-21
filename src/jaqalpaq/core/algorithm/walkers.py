@@ -152,7 +152,7 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
 
     def end_trace(self, context=None):
         if self.current is None:
-            raise JaqalError(f"{self.p_gate} must follow a {self.m_gate}")
+            raise JaqalError(f"{self.m_gate} must follow a {self.p_gate}")
         current = self.current
         current.end = self.address[:]
         current.used_qubits = self.qubits
