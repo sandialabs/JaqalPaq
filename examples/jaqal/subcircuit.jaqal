@@ -1,0 +1,14 @@
+from qscout.v1.std usepulses *
+
+let A 1.5707963267948966
+let B 1.5707963267948966
+
+register q[2]
+
+subcircuit 20 {
+  Rx q[0] A
+}
+
+subcircuit 30 {
+  Rx q[1] B
+}

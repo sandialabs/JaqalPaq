@@ -32,10 +32,18 @@ def ipc_protocol_read(conn):
 
 
 def ipc_protocol_parse(resp_text):
+    overrides = None
+    overrides_prefix = "// OVERRIDES:"
+    for line in resp_text.split("\n"):
+        if line.startswith(overrides_prefix):
+            if overrides is not None:
+                raise JaqalError("OVERRIDES may only be provided once per Jaqal file")
+            overrides = json.loads(line[len(overrides_prefix) :])
+
     # Unvalidated and unauthenticated network-received data is being passed to
     # the Jaqal emulator here.
     circ = parse_jaqal_string(resp_text)
-    return circ
+    return overrides, circ
 
 
 def ipc_protocol_write(conn, exe_res):
@@ -124,8 +132,8 @@ def main(argv):
             import IPython
 
             IPython.embed_kernel()
-        circ = ipc_protocol_parse(resp_text)
-        exe_res = backend(circ).execute()
+        overrides, circ = ipc_protocol_parse(resp_text)
+        exe_res = backend(circ, overrides=overrides).execute()
         ipc_protocol_write(conn, exe_res)
 
     return 0

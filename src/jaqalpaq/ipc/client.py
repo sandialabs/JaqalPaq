@@ -78,8 +78,10 @@ class IPCBackend(IndependentSubcircuitsBackend):
 
         return results
 
-    def _ipc_protocol(self, circuit):
+    def _ipc_protocol(self, circuit, overrides=None):
         jaqal = generate_jaqal_program(circuit)
+        if overrides:
+            jaqal = "".join((jaqal, "\n// OVERRIDES: ", json.dumps(overrides), "\n"))
         sock = self.get_host_socket()
         try:
             results = self._communicate(sock, jaqal.encode())
@@ -99,7 +101,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         circ = job.expanded_circuit
         exe_res = result.ExecutionResult(circ, job.overrides)
 
-        freqs = self._ipc_protocol(circ)
+        freqs = self._ipc_protocol(circ, job.overrides)
         parser = exe_res.accept_normalized_counts()
 
         parser.pass_data(freqs)
