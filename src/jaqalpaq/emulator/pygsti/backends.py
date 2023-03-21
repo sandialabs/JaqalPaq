@@ -7,7 +7,7 @@ from numpy import zeros
 
 from pygsti.protocols import ModelFreeformSimulator
 
-from jaqalpaq.core.algorithm.walkers import TraceSerializer, Trace
+from jaqalpaq.core.algorithm.walkers import Trace
 from jaqalpaq.run.cursor import SubcircuitCursor, State
 from jaqalpaq.run import result
 from jaqalpaq.emulator import backend
