@@ -197,7 +197,7 @@ class GateDefinition(AbstractGate):
 
 class IdleGateDefinition(GateDefinition):
     """
-    Base: :class:`AbstractGate`
+    Base: :class:`GateDefinition`
 
     Represents a gate that merely idles for some duration.
     """

@@ -12,7 +12,7 @@ Environment variables control the behavior of these functions:
     a value starting with '1', 't', or 'T', then unconditionally do NOT
     use the IPC mechanism.
 
- - JAQALPAQ_RUN_PORT -- If his variable is set, and JAQALPAQ_RUN_EMULATOR
+ - JAQALPAQ_RUN_PORT -- If this variable is set, and JAQALPAQ_RUN_EMULATOR
     does not indicate to use the emulator, communicate with another process
     over a local tcp socket on the given port.
 """
