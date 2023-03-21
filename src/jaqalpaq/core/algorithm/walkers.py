@@ -79,7 +79,7 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         # All qubits will be used in every subcircuit, because it is bounded by
         # prepare_all and measure_all.  In the future, we presumably will employ the used
         # qubit functionality of the superclass, and separately report the measured
-        # qubits.  But we do not support partial measurements yet.
+        # qubits.  But we do not support mid-circuit measurements yet.
         if self.qubits is not None:
             raise RuntimeError("Cannot reuse DiscoverSubcircuit object")
         self.qubits = list(chain.from_iterable(circuit.fundamental_registers()))
