@@ -195,11 +195,7 @@ class CircuitWalker(Visitor):
     def visit_Circuit(self, circuit):
         if len(self.breakpoints) == 0:
             return
-        if isinstance(self.breakpoints[0], Locus):
-            self.objective = list(self.breakpoints[self.index].address)
-        else:
-            # deprecated
-            self.objective = self.breakpoints[self.index]
+        self.objective = list(self.breakpoints[self.index].address)
 
         yield from self.visit(circuit.body)
 
@@ -230,11 +226,7 @@ class CircuitWalker(Visitor):
                     self.objective = None
                     return
                 else:
-                    if isinstance(self.breakpoints[0], Locus):
-                        self.objective = list(self.breakpoints[self.index].address)
-                    else:
-                        # deprecated
-                        self.objective = self.breakpoints[self.index]
+                    self.objective = list(self.breakpoints[self.index].address)
             else:
                 address.append(n)
                 yield from self.visit(nxt)
