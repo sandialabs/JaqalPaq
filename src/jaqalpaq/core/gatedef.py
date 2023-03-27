@@ -19,14 +19,21 @@ class AbstractGate:
     :param parameters: What arguments (numbers, qubits, etc) the gate should be called
         with. If None, the gate takes no parameters.
     :type parameters: list(Parameter) or None
+    :param function ideal_unitary: (deprecated) A function mapping a list of all classical
+        arguments to a numpy 2D array representation of the gate's ideal action in the
+        computational basis.
     """
 
-    def __init__(self, name, parameters=None):
+    def __init__(self, name, parameters=None, ideal_unitary=None):
         self._name = name
         if parameters is None:
             self._parameters = []
         else:
             self._parameters = parameters
+
+        if ideal_unitary is not None:
+            warnings.warn("Define unitary in <path>.jaqal_action", DeprecationWarning)
+            self._ideal_unitary = ideal_unitary
 
     def __repr__(self):
         return f"{type(self).__name__}({self.name}, {self.parameters})"
@@ -108,7 +115,15 @@ class AbstractGate:
         params = self.parse_parameters(*args, **kwargs)
         return GateStatement(self, params)
 
-    def copy(self, *, name=None, parameters=None, origin=False, unitary=None):
+    def copy(
+        self,
+        *,
+        name=None,
+        parameters=None,
+        ideal_unitary=False,
+        origin=False,
+        unitary=None,
+    ):
         """Returns a shallow copy of the gate or gate definition.
 
         :param name: (optional) change the name in the copy.
@@ -122,6 +137,8 @@ class AbstractGate:
             copy._name = name
         if parameters is not None:
             copy._parameters = parameters
+        if ideal_unitary is not False:
+            copy._ideal_unitary = ideal_unitary
         if origin is not False:
             copy._origin = origin
         if unitary is not None:
@@ -193,6 +210,14 @@ class GateDefinition(AbstractGate):
         except JaqalError:
             pass
         raise JaqalError("Gate {self.name} has a parameter with unknown type")
+
+    @property
+    def ideal_unitary(self):
+        """(deprecated) The ideal unitary action of the gate on its target qubits"""
+        warnings.warn("Use get_ideal_action instead", DeprecationWarning)
+        from jaqalpaq.emulator._import import get_ideal_action
+
+        return get_ideal_action(self)
 
 
 class IdleGateDefinition(GateDefinition):

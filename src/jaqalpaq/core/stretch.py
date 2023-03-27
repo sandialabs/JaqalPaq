@@ -49,6 +49,10 @@ def stretched_gates(gates, *, suffix=None, update=False, origin=None):
             origin=origin,
         )
 
+        if hasattr(gate, "_ideal_unitary"):
+            # (this process is deprecated)
+            new_gate._ideal_unitary = do_stretch_as_noop(gate._ideal_unitary)
+
         new_gates[new_name] = new_gate
         if add_idle:
             new_name = name + suffix
