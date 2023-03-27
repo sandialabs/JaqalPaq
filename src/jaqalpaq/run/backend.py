@@ -5,6 +5,7 @@ import abc
 import itertools
 
 from jaqalpaq.core.algorithm import expand_macros
+from jaqalpaq.error import JaqalError
 
 
 class JaqalJob:
@@ -51,7 +52,7 @@ class AbstractBackend:
         try:
             (register,) = registers
         except ValueError:
-            raise NotImplementedError("Multiple fundamental registers unsupported.")
+            raise JaqalError("Multiple fundamental registers unsupported.")
 
         return register.size
 
