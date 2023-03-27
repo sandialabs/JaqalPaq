@@ -511,6 +511,48 @@ loop 2 {
 
         self.assertEqual(res, ["measurements agree", "probabilities agree"])
 
+    def test_stretched_gates_noiseless(self):
+        jc = jaqalpaq.parser.parse_jaqal_string(
+            """
+            from qscout.v1.std usepulses *
+
+            register u[3]
+
+            prepare_all
+
+            Rx u[0] 0.7
+            MS u[0] u[1] 0.1 0.3
+            Rz u[2] 0.8
+
+            measure_all
+        """
+        )
+
+        jc_stretched = jaqalpaq.parser.parse_jaqal_string(
+            """
+            from qscout.v1.std usepulses *
+            from qscout.v1.std.stretched usepulses *
+
+            register u[3]
+
+            prepare_all
+
+            Rx_stretched u[0] 0.7 1.5
+            MS_stretched u[0] u[1] 0.1 0.3 3
+            Rz_stretched u[2] 0.8 2.0
+
+            measure_all
+        """
+        )
+
+        res = run_jaqal_circuit(jc)
+        res_stretched = run_jaqal_circuit(jc_stretched)
+
+        for a, b in zip(*(r.by_subbatch[0].by_time for r in (res, res_stretched))):
+            assert np.allclose(
+                *(i.simulated_probabilities.by_int_dense for i in (a, b))
+            )
+
     def test_stretched_gates(self):
         jc = jaqalpaq.parser.parse_jaqal_string(
             """
