@@ -116,6 +116,8 @@ def pygsti_ideal_unitary(gate, evotype):
     """Ideal unitary action of the gate with pyGSTi special casing.
 
     :param gate: The Jaqalpaq gate definition object describing the gate.
+    :param evotype: the pyGSTi evolution type to use for the model.  The default is
+        "statevec", which is sufficient for noiseless simulation.
     """
     ideal_unitary = get_ideal_action(gate)
 
@@ -151,6 +153,8 @@ def build_processor_spec(n_qubits, gates, evotype="default"):
 
     :param n_qubits: the number of qubits in the model
     :param gates: a dictionary of Jaqal gates
+    :param evotype: What kind of object pyGSTi simulates (e.g., density matrix or state
+      vector).  See pyGSTi documentation for details.
     :return: PyGSTi ProcessorSpec to be used in model creation
     """
     unitaries = {}
