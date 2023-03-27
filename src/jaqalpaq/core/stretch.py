@@ -50,11 +50,11 @@ def stretched_gates(gates, *, suffix=None, update=False, origin=None):
             ideal_unitary = None
 
         new_gate = gate.copy(
-            name=new_name, parameters=parameters, ideal_unitary=ideal_unitary
+            name=new_name,
+            parameters=parameters,
+            ideal_unitary=ideal_unitary,
+            origin=origin,
         )
-
-        if origin is not None:
-            new_gate.origin = origin
 
         new_gates[new_name] = new_gate
         if add_idle:

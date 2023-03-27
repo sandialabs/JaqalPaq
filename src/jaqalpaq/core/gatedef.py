@@ -104,7 +104,7 @@ class AbstractGate:
     def __call__(self, *args, **kwargs):
         return self.call(*args, **kwargs)
 
-    def copy(self, *, name=None, parameters=None, ideal_unitary=None):
+    def copy(self, *, name=None, parameters=None, ideal_unitary=None, origin=False):
         """Returns a shallow copy of the gate or gate definition.
 
         :param name: (optional) change the name in the copy.
@@ -120,6 +120,8 @@ class AbstractGate:
             copy._parameters = parameters
         if ideal_unitary is not None:
             copy._ideal_unitary = ideal_unitary
+        if origin is not False:
+            copy._origin = origin
 
         return copy
 
@@ -131,10 +133,19 @@ class GateDefinition(AbstractGate):
     Represents a gate that's implemented by a pulse sequence in a gate definition file.
     """
 
+    def __init__(self, *args, origin=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._origin = origin
+
     @property
     def ideal_unitary(self):
         """The ideal unitary action of the gate on its target qubits"""
         return self._ideal_unitary
+
+    @property
+    def origin(self):
+        """The Jaqal module in which this gate is defined."""
+        return self._origin
 
     @property
     def used_qubits(self):
@@ -192,10 +203,12 @@ class IdleGateDefinition(GateDefinition):
         # Special case handling of prepare and measure gates
         if gate.name in ("prepare_all", "measure_all"):
             raise JaqalError(f"Cannot make an idle gate for {gate.name}")
+        super().__init__(
+            name=name if name else f"I_{gate.name}",
+            parameters=gate._parameters,
+            origin=gate.origin,
+        )
         self._parent_def = gate
-        self._parameters = gate._parameters
-        self._name = name if name else f"I_{gate.name}"
-        self.origin = gate.origin
 
     @property
     def used_qubits(self):

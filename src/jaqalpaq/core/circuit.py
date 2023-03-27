@@ -125,5 +125,5 @@ def normalize_native_gates(native_gates, origin=False):
         raise JaqalError("Native gates must be GateDefinition instances")
     if origin is not False:
         for gate in native_gates.values():
-            gate.origin = origin
+            gate._origin = origin
     return native_gates
