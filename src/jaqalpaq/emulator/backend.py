@@ -32,8 +32,8 @@ class ExtensibleBackend(AbstractBackend):
           - Otherwise, stretched_gates must be the numerical stretch factor that is
             applied to all gates (no extra stretched gates are added
         """
-        self.stretched_gates = stretched_gates
         super().__init__(*args, **kwargs)
+        self.stretched_gates = stretched_gates
 
     def set_defaults(self, kwargs, **defaults):
         """Set parameters from a list of defaults and function kwargs.
