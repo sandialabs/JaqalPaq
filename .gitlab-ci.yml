@@ -59,9 +59,16 @@ Unified Tests:
     - LOCAL_JAQALPAQ=./jaqalpaq LOCAL_JAQALPAQ_EXTRAS="" LOCAL_QSCOUT_GATEMODELS=./qscout-gatemodels
       JAQALPAQ_OPTS="pygsti-integration,tests"
       ./jaqalpaq/install.sh
+    - pip install pytest-cov
     - cd jaqalpaq
     - rm -f /tmp/ipc_test
-    - pytest
+    - pytest --cov=src/ --cov=../qscout-gatemodels/src --cov-branch --cov-report=html
+  artifacts:
+    when: always
+    paths:
+      - htmlcov
+    expire_in: 1 week
+
 
 Notebooks:
   stage: Reproducibility

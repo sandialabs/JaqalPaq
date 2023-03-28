@@ -28,6 +28,7 @@ class IPCTester(unittest.TestCase):
             exe = run_jaqal_circuit(circuit, backend=backend, **kwargs)
         finally:
             host_socket.close()
+            time.sleep(0.1)
             P.send_signal(subprocess.signal.SIGTERM)
             P.communicate()
 
