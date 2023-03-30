@@ -104,7 +104,7 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
 
     def simulate_subcircuit(self, job, subcircuit):
         self._simulate_subcircuit(job, subcircuit)
-        subcircuit._simulated = True
+        subcircuit.simulated = True
         subcircuit._tree.simulated_probability = 1
 
     @abc.abstractmethod

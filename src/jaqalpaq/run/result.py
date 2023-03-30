@@ -599,7 +599,7 @@ class SubcircuitResult:
             tree = self._tree = ReadoutTreeNode(SubcircuitCursor.terminal_cursor(end))
             tree._owner = self
         self._prepare_actions = []
-        self._simulated = False
+        self.simulated = False
         self.subbatch_i = subbatch_i
 
     @property
@@ -701,7 +701,7 @@ class SubcircuitResult:
 class BackwardsCompatibleView:
     @property
     def _probabilities(self):
-        if self._subcircuit._simulated:
+        if self._subcircuit.simulated:
             return self.simulated_probabilities
         else:
             return self._relative_frequencies
