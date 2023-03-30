@@ -16,23 +16,38 @@ Environment variables control the behavior of these functions:
     does not indicate to use the emulator, communicate with another process
     over a local tcp socket on the given port.
 """
-
-import os
-
 from jaqalpaq.error import JaqalError
 from jaqalpaq.parser import parse_jaqal_file, parse_jaqal_string
 
 
-def _get_backend():
-    if os.environ.get("JAQALPAQ_RUN_EMULATOR", "").startswith(("1", "t", "T")):
-        return
-    if os.environ.get("JAQALPAQ_RUN_PORT", False):
-        from jaqalpaq.ipc.client import IPCBackend
-
-        return IPCBackend()
+DEFAULT_BACKEND = None
+FORCE_BACKEND = None
 
 
-FORCE_BACKEND = _get_backend()
+def _get_backend(backend):
+    global DEFAULT_BACKEND
+
+    if FORCE_BACKEND is not None:
+        return FORCE_BACKEND
+
+    if backend is not None:
+        return backend
+
+    if DEFAULT_BACKEND is None:
+        import os
+
+        if os.environ.get("JAQALPAQ_RUN_PORT", False) and not os.environ.get(
+            "JAQALPAQ_RUN_EMULATOR", ""
+        ).startswith(("1", "t", "T")):
+            from jaqalpaq.ipc.client import IPCBackend
+
+            DEFAULT_BACKEND = IPCBackend()
+        else:
+            from jaqalpaq.emulator.unitary import UnitarySerializedEmulator
+
+            DEFAULT_BACKEND = UnitarySerializedEmulator()
+
+    return DEFAULT_BACKEND
 
 
 def run_jaqal_circuit(
@@ -44,7 +59,6 @@ def run_jaqal_circuit(
     :param Circuit circuit: The Jaqalpaq circuit to be run.
     :param backend: The backend to perform the circuit simulation/emulation.
         Defaults to UnitarySerializedEmulator.
-    :param force_sim: Unconditionally do not use the IPC.
 
     :rtype: ExecutionResult
 
@@ -56,15 +70,10 @@ def run_jaqal_circuit(
         for random behavior.
 
     """
-    if FORCE_BACKEND is None:
-        if backend is None:
-            from jaqalpaq.emulator.unitary import UnitarySerializedEmulator
+    if (force_sim is not False) or (emulator_backend is not None):
+        raise JaqalError("Specify backend, DEFAULT_BACKEND, or FORCE_BACKEND")
 
-            backend = UnitarySerializedEmulator()
-    else:
-        backend = FORCE_BACKEND
-
-    return backend(circuit, **kwargs).execute()
+    return _get_backend(backend)(circuit, **kwargs).execute()
 
 
 def run_jaqal_string(jaqal, import_path=None, **kwargs):
