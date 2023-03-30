@@ -49,7 +49,7 @@ class CircuitEmulator(backend.EmulatedIndependentSubcircuitsBackend):
 
         p = result.validate_probabilities(probs)
 
-        tree = subcirc._tree
+        tree = subcirc.tree
         tree.simulated_density_matrix = rho
 
         for k, v in enumerate(p):

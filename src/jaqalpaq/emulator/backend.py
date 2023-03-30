@@ -105,7 +105,7 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     def simulate_subcircuit(self, job, subcircuit):
         self._simulate_subcircuit(job, subcircuit)
         subcircuit.simulated = True
-        subcircuit._tree.simulated_probability = 1
+        subcircuit.tree.simulated_probability = 1
 
     @abc.abstractmethod
     def _simulate_subcircuit(self, job, subcircuit):
@@ -118,7 +118,7 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
     def _simulate_ci(self, ci, job):
         subcircuit = ci._subcircuit
         for _ in range(ci.shots):
-            node = subcircuit._tree
+            node = subcircuit.tree
             while not node.classical_state.state == cursor.State.shutdown:
                 keys = list(node.subsequent.keys())
                 p = [node.subsequent[k].simulated_probability for k in keys]

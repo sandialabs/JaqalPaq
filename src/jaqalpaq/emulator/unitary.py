@@ -152,4 +152,4 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
             else:
                 raise NotImplementedError()
 
-        handle_unitary(cursor, vec, subcirc._tree)
+        handle_unitary(cursor, vec, subcirc.tree)

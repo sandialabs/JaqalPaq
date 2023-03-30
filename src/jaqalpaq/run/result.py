@@ -627,6 +627,10 @@ class SubcircuitResult:
         return self._filled_circuit
 
     @property
+    def tree(self):
+        return self._tree
+
+    @property
     def measured_qubits(self):
         """A list of the qubits that are measured, in their display order."""
         try:
