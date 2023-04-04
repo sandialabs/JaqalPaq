@@ -282,6 +282,11 @@ class SubcircuitResult:
         self._index = int(index)
         self.circuitindex_c = circuitindex_c
         self._circuit = circuit
+        try:
+            _head = next(iter(start.lineage))
+        except StopIteration as exc:
+            raise JaqalError("Start of subcircuit has empty lineage") from exc
+        self._filled_circuit = _head.object
         if tree is not None:
             self._tree = tree
             update_tree(lambda node: setattr(node, "_owner", self), self._tree)
@@ -309,10 +314,18 @@ class SubcircuitResult:
         return self._circuit
 
     @property
+    def filled_circuit(self):
+        """
+        The circuit object, with any overriden let values applied, for which
+        this SubcircuitResult object contains data.
+        """
+        return self._filled_circuit
+
+    @property
     def measured_qubits(self):
         """A list of the qubits that are measured, in their display order."""
         try:
-            (reg,) = next(iter(self._start.lineage)).object.registers.values()
+            (reg,) = self.filled_circuit.registers.values()
         except ValueError as exc:
             raise JaqalError("Circuits must have exactly one register") from exc
         return list(reg)
