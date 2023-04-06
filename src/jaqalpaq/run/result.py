@@ -117,6 +117,10 @@ class ExecutionResult:
         sno = list(walk_circuit(circuit, [start for (start, end) in subcirc_loci]))
 
         self._classical_cursor = cc = ClassicalCursor(overrides, subcirc_list=sno)
+        if kwargs:
+            raise JaqalError(
+                "Setting _attributes through the constructor is not supported"
+            )
         self._attributes = kwargs
 
         self._subcircuits = subcircs = []
