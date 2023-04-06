@@ -50,6 +50,19 @@ def _get_backend(backend):
     return DEFAULT_BACKEND
 
 
+def _should_autoload_pulses(backend=None, **_kwargs):
+    import os
+
+    if not os.environ.get("JAQALPAQ_RUN_PORT", False):
+        return True
+
+    backend = _get_backend(backend)
+
+    from jaqalpaq.ipc.client import IPCBackend
+
+    return not isinstance(backend, IPCBackend)
+
+
 def run_jaqal_circuit(
     circuit, backend=None, force_sim=False, emulator_backend=None, **kwargs
 ):
@@ -90,8 +103,12 @@ def run_jaqal_string(jaqal, import_path=None, **kwargs):
         See :meth:`run_jaqal_circuit` for additional arguments
     """
     return run_jaqal_circuit(
-        parse_jaqal_string(jaqal, autoload_pulses=True, import_path=import_path),
-        **kwargs,
+        parse_jaqal_string(
+            jaqal,
+            autoload_pulses=_should_autoload_pulses(**kwargs),
+            import_path=import_path,
+        ),
+        **kwargs
     )
 
 
@@ -110,8 +127,12 @@ def run_jaqal_file(fname, import_path=None, **kwargs):
 
     """
     return run_jaqal_circuit(
-        parse_jaqal_file(fname, autoload_pulses=True, import_path=import_path),
-        **kwargs,
+        parse_jaqal_file(
+            fname,
+            autoload_pulses=_should_autoload_pulses(**kwargs),
+            import_path=import_path,
+        ),
+        **kwargs
     )
 
 
