@@ -41,11 +41,13 @@ class IPCBackend(IndependentSubcircuitsBackend):
             pass
 
         try:
-            return socket.create_connection(self._address)
+            self._host_socket = socket.create_connection(self._address)
         except Exception as exc:
             raise JaqalError(
                 f"Could not connect to host {':'.join(self._address)}: {exc}"
             )
+
+        return self._host_socket
 
     def _communicate(self, socket, data):
         socket.send(data)
@@ -83,11 +85,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         if overrides:
             jaqal = "".join((jaqal, "\n// OVERRIDES: ", json.dumps(overrides), "\n"))
         sock = self.get_host_socket()
-        try:
-            results = self._communicate(sock, jaqal.encode())
-        finally:
-            # Can this be reused?
-            sock.close()
+        results = self._communicate(sock, jaqal.encode())
 
         qubit_count = math.log2(len(results[0]))
         if 2**qubit_count != len(results[0]):
