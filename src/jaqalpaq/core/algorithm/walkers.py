@@ -250,17 +250,7 @@ class CircuitWalker(Visitor):
             yield from self.visit(block)
 
     def visit_CaseStatement(self, case):
-        # store the walk status
-        index = self.index
-        address = self.address[:]
-        objective = self.objective
-
-        # loop over the classical parts
-        # Restore the walk status at the start of every loop
-        self.objective = objective
-        self.address[:] = address[:] + case.state
-        self.index = index
-        yield from self.visit(case.statements)
+        raise NotImplementedError("case statements are not supporetd")
 
     def visit_BranchStatement(self, branch):
         raise JaqalError("Tracing a circuit with a branch not supported")
