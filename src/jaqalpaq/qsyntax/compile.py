@@ -3,7 +3,7 @@
 # certain rights in this software.
 
 import argparse
-from .qsyntax import is_qcircuit
+from jaqalpaq.qsyntax.qsyntax import is_qcircuit
 from jaqalpaq.generator import generate_jaqal_program
 
 
