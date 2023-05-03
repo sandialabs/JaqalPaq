@@ -158,10 +158,10 @@ class RelativeFrequencySubcircuit(Subcircuit):
     Additionally, track the relative frequencies of each measurement result.
     """
 
-    def __init__(self, *args, relative_frequencies=None, **kwargs):
+    def __init__(self, *args, normalized_counts=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if relative_frequencies is not None:
-            self._relative_frequencies = validate_probabilities(relative_frequencies)
+        if normalized_counts is not None:
+            self._normalized_counts = validate_probabilities(normalized_counts)
 
     @property
     def relative_frequency_by_int(self):
@@ -170,14 +170,14 @@ class RelativeFrequencySubcircuit(Subcircuit):
         representing qubit 0.  I.e., "000" for 0b000, "100" for 0b001, "010" for 0b010,
         etc.
         """
-        return self._relative_frequencies
+        return self._normalized_counts
 
     @property
     def relative_frequency_by_str(self):
         """Return the relative frequency associated with each measurement result formatted as a
         dictionary mapping result strings to their respective probabilities."""
         qubits = len(self._trace.used_qubits)
-        rf = self._relative_frequencies
+        rf = self._normalized_counts
         return OrderedDict(
             [(f"{n:b}".zfill(qubits)[::-1], v) for n, v in enumerate(rf)]
         )
@@ -213,16 +213,16 @@ class ReadoutSubcircuit(RelativeFrequencySubcircuit):
         # Don't require numpy in the experiment
         import numpy
 
-        assert "relative_frequencies" not in kwargs
+        assert "normalized_counts" not in kwargs
         assert "readouts" not in kwargs
 
         self._readouts = []
-        super().__init__(trace, index, relative_frequencies=None, **kwargs)
+        super().__init__(trace, index, normalized_counts=None, **kwargs)
         self._counts = numpy.zeros(2 ** len(self.measured_qubits))
 
     def _recalculate_counts(self):
         try:
-            del self._relative_frequencies
+            del self._normalized_counts
         except AttributeError:
             pass
 
@@ -233,7 +233,7 @@ class ReadoutSubcircuit(RelativeFrequencySubcircuit):
 
     def accept_readout(self, readout):
         try:
-            del self._relative_frequencies
+            del self._normalized_counts
         except AttributeError:
             pass
 
@@ -244,10 +244,10 @@ class ReadoutSubcircuit(RelativeFrequencySubcircuit):
     @property
     def relative_frequency_by_int(self):
         try:
-            return self._relative_frequencies
+            return self._normalized_counts
         except AttributeError:
             counts = self._counts
-            rf = self._relative_frequencies = counts / counts.sum()
+            rf = self._normalized_counts = counts / counts.sum()
             return rf
 
     @property

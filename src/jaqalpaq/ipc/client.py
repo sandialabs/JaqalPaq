@@ -99,7 +99,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         for n, tr in enumerate(job.traces):
             subcircs.append(
                 RelativeFrequencySubcircuit(
-                    tr, n, relative_frequencies=[float(rf) for rf in freqs[n]]
+                    tr, n, normalized_counts=[float(rf) for rf in freqs[n]]
                 )
             )
 
