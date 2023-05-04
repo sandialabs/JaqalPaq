@@ -61,8 +61,6 @@ class ForwardSimulatorTester(unittest.TestCase):
             true_total_prob[val] += 1
             self.assertEqual(sc_n.by_time[n].normalized_counts.by_int[val], 1)
             self.assertEqual(sc_n.normalized_counts.by_int[val][n], 1)
-            self.assertEqual(sc_n.by_time[n].readouts.as_int, val)
-            self.assertEqual(sc_n.readouts.by_time[n].as_int, val)
         true_total_prob /= len(true_output)
         assert np.allclose(true_total_prob, sc.relative_frequency_by_int)
 

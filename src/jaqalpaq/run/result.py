@@ -788,19 +788,6 @@ class SubcircuitView:
     def subbatch(self):
         return self.result.by_subbatch[self.subbatch_i]
 
-    def __getattr__(self, attribute):
-        try:
-            attr = self.result._attributes[attribute]
-        except KeyError:
-            raise AttributeError(
-                f"JaqalPaq: '{type(self).__name__}' object has no attribute '{attribute}'"
-            )
-        return AttributeView(self._subcircuit, attribute, attr)
-
-    def __dir__(self):
-        yield from super().__dir__()
-        yield from self.result._attributes.keys()
-
     @property
     def num_repeats(self):
         return [ci.num_repeats for ci in self.by_time]
@@ -923,21 +910,6 @@ class CircuitIndexView:
     def __repr__(self):
         ci = self._ci
         return f"<CircuitIndexView {ci.subbatch.index}/{ci.subcircuit_i}:{self.per_subcircuit_time_index} ({self.time_i}) of {self.result}>"
-
-    def __getattr__(self, attribute):
-        ci = self._ci
-        try:
-            attr = self.result._attributes[attribute]
-        except KeyError:
-            raise AttributeError(
-                f"JaqalPaq: '{type(self).__name__}' object has no attribute '{attribute}'"
-            )
-
-        return attr[ci.subbatch.index][ci.subcircuit_i][ci.per_sc_time_i]
-
-    def __dir__(self):
-        yield from super().__dir__()
-        yield from self.result._attributes.keys()
 
     @property
     def num_repeats(self):
