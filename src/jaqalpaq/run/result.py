@@ -225,7 +225,7 @@ class ExecutionResult:
                 readouts_for_subcirc = readouts_for_sb.get(sc.index, None)
                 if readouts_for_subcirc is None:
                     readouts_for_subcirc = readouts_for_sb[sc.index] = []
-                for _ in range(ci.shots):
+                for _ in range(ci.num_repeats):
                     subcirc_accept = sc.accept_readouts(ci._ci.per_sc_time_i)
                     while not subcirc_accept.done:
                         readout = yield
@@ -665,7 +665,6 @@ class SubcircuitResult:
                 child.normalized_count /= node.normalized_count
 
         update_tree(_update, self._tree)
-        self._tree.num_repeats = self._tree.normalized_count.astype(int)
         self._tree.normalized_count[:] = 1
 
     def _prepare_tree_node(self, new):
@@ -804,7 +803,7 @@ class SubcircuitView:
 
     @property
     def num_repeats(self):
-        return self._subcircuit._tree.num_repeats
+        return [ci.num_repeats for ci in self.by_time]
 
     class simulated_probabilities(CumulativeTreeAccessor):
         attrname = "simulated_probability"
@@ -941,7 +940,7 @@ class CircuitIndexView:
         yield from self.result._attributes.keys()
 
     @property
-    def shots(self):
+    def num_repeats(self):
         shots = self._ci.subbatch.get_override("__repeats__")
         if shots is not None:
             return shots
@@ -966,10 +965,6 @@ class CircuitIndexView:
     @property
     def subcircuit_i(self):
         return self._ci.subcircuit_i
-
-    @property
-    def num_repeats(self):
-        return self._subcircuit._tree.num_repeats[self._ci.per_sc_time_i]
 
     class simulated_probabilities(CITreeAccessor):
         def _func(self, index):

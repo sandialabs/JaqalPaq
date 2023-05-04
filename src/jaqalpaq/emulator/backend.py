@@ -117,7 +117,7 @@ class EmulatedIndependentSubcircuitsBackend(IndependentSubcircuitsBackend):
 
     def _simulate_ci(self, ci, job):
         subcircuit = ci._subcircuit
-        for _ in range(ci.shots):
+        for _ in range(ci.num_repeats):
             node = subcircuit.tree
             while not node.classical_state.state == cursor.State.shutdown:
                 keys = list(node.subsequent.keys())
