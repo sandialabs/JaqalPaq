@@ -580,9 +580,7 @@ def update_tree(update_node, tree):
 class SubcircuitResult:
     """(internal) Encapsulate results from the part of a circuit between a prepare_all and measure_all gate."""
 
-    def __init__(
-        self, index, start, end, subbatch_i, circuitindex_c, circuit, *, tree=None
-    ):
+    def __init__(self, index, start, end, subbatch_i, circuitindex_c, circuit):
         """(internal) Instantiate a Subcircuit"""
         self._start = start
         if isinstance(start.object, BlockStatement) and start.object.subcircuit:
@@ -596,12 +594,8 @@ class SubcircuitResult:
         except StopIteration as exc:
             raise JaqalError("Start of subcircuit has empty lineage") from exc
         self._filled_circuit = _head.object
-        if tree is not None:
-            self._tree = tree
-            update_tree(lambda node: setattr(node, "_owner", self), self._tree)
-        else:
-            tree = self._tree = ReadoutTreeNode(SubcircuitCursor.terminal_cursor(end))
-            tree._owner = self
+        tree = self._tree = ReadoutTreeNode(SubcircuitCursor.terminal_cursor(end))
+        tree._owner = self
         self._prepare_actions = []
         self.simulated = False
         self.subbatch_i = subbatch_i
