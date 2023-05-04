@@ -703,7 +703,7 @@ class BackwardsCompatibleView:
     @property
     def _probabilities(self):
         if self._subcircuit.simulated:
-            return self.simulated_probabilities
+            return self._simulated_probabilities
         else:
             return self._relative_frequencies
 
@@ -717,11 +717,11 @@ class BackwardsCompatibleView:
 
     @property
     def simulated_probability_by_int(self):
-        return self.simulated_probabilities.by_int_dense
+        return self._simulated_probabilities.by_int_dense
 
     @property
     def simulated_probability_by_str(self):
-        return self.simulated_probabilities.by_str_dense
+        return self._simulated_probabilities.by_str_dense
 
     @property
     def relative_frequency_by_int(self):
@@ -788,15 +788,32 @@ class SubcircuitView:
 
     class simulated_probabilities(CumulativeTreeAccessor):
         attrname = "simulated_probability"
-        default = 0.0
-        start = 1.0
+
+        @property
+        def default(self):
+            return self._subcircuit._result_array()
+
+        @property
+        def start(self):
+            ret = self._subcircuit._result_array()
+            ret[:] = 1
+            return ret
 
         def reduce(self, cur, nxt):
             return cur * nxt
 
     class conditional_simulated_probabilities(TreeAccessor):
         attrname = "simulated_probability"
-        default = 0.0
+
+        @property
+        def default(self):
+            return self._subcircuit._result_array()
+
+        @Accessor.direct
+        def _func(self, index):
+            wide = self.default
+            wide[:] = 1
+            return super()._func(index) * wide
 
     class normalized_counts(CumulativeTreeAccessor):
         attrname = "normalized_count"
@@ -846,6 +863,15 @@ class DeprecatedSubcircuitView(SubcircuitView, BackwardsCompatibleView):
         def reduce(self, cur, nxt):
             (l,) = nxt.shape
             return cur * nxt.sum() / l
+
+    class _simulated_probabilities(CumulativeTreeAccessor):
+        # The existing API did not distinguish different circuit indexes
+        attrname = "simulated_probability"
+        default = 0.0
+        start = 1.0
+
+        def reduce(self, cur, nxt):
+            return cur * nxt
 
     @property
     def readouts(self):
@@ -932,13 +958,17 @@ class CircuitIndexView:
     def subcircuit_i(self):
         return self._ci.subcircuit_i
 
-    class simulated_probabilities(CITreeAccessor):
-        def _func(self, index):
-            return self.subcircuit.simulated_probabilities[index]
+    class simulated_probabilities(CumulativeTreeAccessor):
+        attrname = "simulated_probability"
+        default = 0.0
+        start = 1.0
 
-    class conditional_simulated_probabilities(CITreeAccessor):
-        def _func(self, index):
-            return self.subcircuit.conditional_simulated_probabilities[index]
+        def reduce(self, cur, nxt):
+            return cur * nxt
+
+    class conditional_simulated_probabilities(TreeAccessor):
+        attrname = "simulated_probability"
+        default = 0.0
 
     class normalized_counts(CumulativeTreeAccessor, CITreeAccessor):
         attrname = "normalized_count"

@@ -26,6 +26,15 @@ def example(*args):
     return Path("examples", "jaqal", *args)
 
 
+def get_unif_val(view):
+    def _inner(v):
+        val = v[0]
+        assert val == v
+        return val
+
+    return {k: _inner(v) for (k, v) in view.items()}
+
+
 class ForwardSimulatorTester(unittest.TestCase):
     def setUp(self):
         builder = CircuitBuilder(jaqal_gates.ALL_GATES)
@@ -109,9 +118,15 @@ subcircuit {
             "\n".join(("from qscout.v1.std usepulses *", jaqal_string))
         )
 
+        byt = res.by_subbatch[0].by_time[0]
+        bys = res.by_subbatch[0].by_subcircuit[0]
+
         for c_dict in (
             res.subcircuits[0].probability_by_str,
-            res.by_subbatch[0].by_time[0].simulated_probabilities,
+            byt.simulated_probabilities,
+            byt.conditional_simulated_probabilities,
+            get_unif_val(bys.simulated_probabilities.by_str_dense),
+            get_unif_val(bys.conditional_simulated_probabilities.by_str_dense),
         ):
             self.assertAlmostEqual(c_dict["000"], 0.5)
             self.assertAlmostEqual(c_dict["001"], 0)
@@ -136,9 +151,15 @@ subcircuit 10 {
             "\n".join(("from qscout.v1.std usepulses *", jaqal_string))
         )
 
+        byt = res.by_subbatch[0].by_time[0]
+        bys = res.by_subbatch[0].by_subcircuit[0]
+
         for c_dict in (
             res.subcircuits[0].probability_by_str,
-            res.by_subbatch[0].by_time[0].simulated_probabilities,
+            byt.simulated_probabilities,
+            byt.conditional_simulated_probabilities,
+            get_unif_val(bys.simulated_probabilities.by_str_dense),
+            get_unif_val(bys.conditional_simulated_probabilities.by_str_dense),
         ):
             self.assertAlmostEqual(c_dict["000"], 0.5)
             self.assertAlmostEqual(c_dict["001"], 0)
