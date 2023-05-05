@@ -205,6 +205,25 @@ class QsyntaxTester(unittest.TestCase):
         text = "prepare_all; Foo 1 2 3 4; measure_all"
         self.run_test(func, text, inject_pulses=gatedefs)
 
+    def test_sequential_function(self):
+        """Test using a function with a Q.sequential decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.sequential
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_global_sequential_function(self):
+        """Test a function outside a circuit with a Q.sequential decorator."""
+        self.fail()
+
     def run_test(self, func, text, *args, inject_pulses=None):
         func_circ = func(*args)
         text_circ = parse_jaqal_string(

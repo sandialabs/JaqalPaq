@@ -66,7 +66,11 @@ class Q:
     """
 
     def __init__(self, stack):
+        # A stack mimicking the structure of the Jaqal program
         self._stack = stack
+        # Stored blocks that are inserted later. Similar to macros but
+        # not implemented using Jaqal macros.
+        self._blocks = {}
 
     def __getattr__(self, name):
         """Return an object that represents a gate wiith an unknown
@@ -75,7 +79,19 @@ class Q:
         :param string name: The name of the gate
         """
 
+        if name in self._blocks:
+            return self._make_block(*self._blocks[name])
+
         return QGate(name, self._stack)
+
+    def _make_block(self, func, context):
+        """Create a block from a function that was stored earlier."""
+
+        def do_block(*args):
+            with context():
+                func(self, *args)
+
+        return do_block
 
     def register(self, size, name=None):
         """Create a register with the given size.
@@ -111,8 +127,26 @@ class Q:
 
         self._stack.set_statement(loop)
 
+    def sequential(self, func=None):
+        """When used as a context, open a new sequential block. When used as a
+        decorator, register a sequential block that can be inserted later."""
+        if func is not None:
+            self._add_block(func, 'sequential')
+        return self._sequential_context()
+
+    def _add_block(self, func, source):
+        if not callable(func):
+            raise JaqalError(f"Argument to {source}() must be callable, found {func} (type={type(func)})")
+        try:
+            func_name = func.__name__
+        except AttributeError:
+            raise JaqalError(f"Could not determine name of function used with {source}()")
+        if func_name in self._blocks:
+            raise JaqalError(f"Overwriting previous block called {func_name}")
+        self._blocks[func_name] = (func, getattr(self, source))
+
     @contextmanager
-    def sequential(self):
+    def _sequential_context(self):
         with self._stack.frame():
             yield
             block = QSequentialBlock.from_stack(self._stack)
