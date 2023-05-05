@@ -221,8 +221,19 @@ class QsyntaxTester(unittest.TestCase):
         self.run_test(func, text)
 
     def test_global_sequential_function(self):
-        """Test a function outside a circuit with a Q.sequential decorator."""
-        self.fail()
+        """Test a function outside a circuit with a circuit.sequential decorator."""
+
+        @circuit.sequential
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
 
     def run_test(self, func, text, *args, inject_pulses=None):
         func_circ = func(*args)

@@ -14,48 +14,64 @@ from jaqalpaq.run import run_jaqal_circuit
 from jaqalpaq.generator import generate_jaqal_program
 
 
-def circuit(
-    *args,
-    inject_pulses=None,
-    autoload_pulses="ignore",
-    **kwargs,
-):
-    """Inner decorator function defining a Jaqal circuit by adding all
-    statements defined inside of the function decorated with this
-    decorator.
+class CircuitInterface:
+    def __init__(self):
+        self._blocks = {}
 
-    :param inject_pulses: If given, use these pulses specifically.
+    def sequential(self, func):
+        """Decorator that registers a function as a sequential block that can
+        be inserted later."""
+        _add_block(self._blocks, func, "sequential")
 
-    :param autoload_pulses: Whether to use the usepulses statement
-    when parsing. Can be given the special value "ignore" (default) to
-    use import pulses when possible, but continue in the case of
-    failure.
+    def __call__(
+        self,
+        *args,
+        inject_pulses=None,
+        autoload_pulses="ignore",
+        **kwargs,
+    ):
+        """Inner decorator function defining a Jaqal circuit by adding all
+        statements defined inside of the function decorated with this
+        decorator.
 
-    :rtype: QCircuit
+        :param inject_pulses: If given, use these pulses specifically.
 
-    """
+        :param autoload_pulses: Whether to use the usepulses statement
+        when parsing. Can be given the special value "ignore" (default) to
+        use import pulses when possible, but continue in the case of
+        failure.
 
-    def outer(func):
-        @functools.wraps(func)
-        def inner(*args, **kwargs):
-            stack = Stack()
-            qsyntax = Q(stack)
-            with stack.frame():
-                func(qsyntax, *args, **kwargs)
-                return circuit_from_stack(
-                    qsyntax,
-                    inject_pulses=inject_pulses,
-                    autoload_pulses=autoload_pulses,
-                )
+        :rtype: QCircuit
 
-        argspec = getfullargspec(func)
-        default_count = len(argspec.defaults) if argspec.defaults else 0
-        return mark_qcircuit(inner, len(argspec.args) - default_count - 1)
+        """
 
-    if len(args) > 0 and callable(args[0]):
-        return outer(args[0])
-    else:
-        return outer
+        def outer(func):
+            @functools.wraps(func)
+            def inner(*args, **kwargs):
+                stack = Stack()
+                qsyntax = Q(stack, dict(self._blocks))
+                with stack.frame():
+                    func(qsyntax, *args, **kwargs)
+                    return circuit_from_stack(
+                        qsyntax,
+                        inject_pulses=inject_pulses,
+                        autoload_pulses=autoload_pulses,
+                    )
+
+            argspec = getfullargspec(func)
+            default_count = len(argspec.defaults) if argspec.defaults else 0
+            return mark_qcircuit(inner, len(argspec.args) - default_count - 1)
+
+        if len(args) > 0 and callable(args[0]):
+            return outer(args[0])
+        else:
+            return outer
+
+
+# The primary way the user will interface with Qsyntax. When used as a
+# decorator on a function, creates a circuit. It can also be used to
+# register certain global objects.
+circuit = CircuitInterface()
 
 
 class Q:
@@ -65,12 +81,12 @@ class Q:
 
     """
 
-    def __init__(self, stack):
+    def __init__(self, stack, blocks):
         # A stack mimicking the structure of the Jaqal program
         self._stack = stack
         # Stored blocks that are inserted later. Similar to macros but
         # not implemented using Jaqal macros.
-        self._blocks = {}
+        self._blocks = blocks
 
     def __getattr__(self, name):
         """Return an object that represents a gate wiith an unknown
@@ -84,8 +100,10 @@ class Q:
 
         return QGate(name, self._stack)
 
-    def _make_block(self, func, context):
+    def _make_block(self, func, context_name):
         """Create a block from a function that was stored earlier."""
+
+        context = getattr(self, context_name)
 
         def do_block(*args):
             with context():
@@ -131,19 +149,8 @@ class Q:
         """When used as a context, open a new sequential block. When used as a
         decorator, register a sequential block that can be inserted later."""
         if func is not None:
-            self._add_block(func, 'sequential')
+            _add_block(self._blocks, func, "sequential")
         return self._sequential_context()
-
-    def _add_block(self, func, source):
-        if not callable(func):
-            raise JaqalError(f"Argument to {source}() must be callable, found {func} (type={type(func)})")
-        try:
-            func_name = func.__name__
-        except AttributeError:
-            raise JaqalError(f"Could not determine name of function used with {source}()")
-        if func_name in self._blocks:
-            raise JaqalError(f"Overwriting previous block called {func_name}")
-        self._blocks[func_name] = (func, getattr(self, source))
 
     @contextmanager
     def _sequential_context(self):
@@ -680,3 +687,21 @@ def is_qcircuit(func, argcount=None):
     if argcount is not None and getattr(func, "_QCIRCUIT_ARG_COUNT") != argcount:
         return False
     return True
+
+
+def _add_block(blocks, func, source):
+    """Add a function block to a dictionary of stored blocks."""
+    if not callable(func):
+        raise JaqalError(
+            f"Argument to {source}() must be callable, found {func} (type={type(func)})"
+        )
+    try:
+        func_name = func.__name__
+    except AttributeError:
+        raise JaqalError(f"Could not determine name of function used with {source}()")
+    # We could test to make sure the user isn't redefining a block, as
+    # this is usually an error. However, Python silently allows this
+    # behavior in general. Also, there are times when it is desirable,
+    # such as locally overriding a block, or iterating on a circuit in
+    # a Jupyter notebook without reloading the kernel.
+    blocks[func_name] = (func, source)
