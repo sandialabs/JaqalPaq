@@ -13,6 +13,7 @@ class QsyntaxTester(unittest.TestCase):
 
     def setUp(self):
         jaqalpaq.core.branch.USE_EXPERIMENTAL_BRANCH = True
+        circuit.clear()
 
     def tearDown(self):
         jaqalpaq.core.branch.USE_EXPERIMENTAL_BRANCH = False
@@ -106,10 +107,29 @@ class QsyntaxTester(unittest.TestCase):
         text = "prepare_all; {Foo 1 2 3}; measure_all"
         self.run_test(func, text)
 
+    def test_sequential_block_noparen(self):
+        @circuit
+        def func(Q):
+            with Q.sequential:
+                Q.Foo(1, 2, 3)
+
+        text = "prepare_all; {Foo 1 2 3}; measure_all"
+        self.run_test(func, text)
+
     def test_parallel_block(self):
         @circuit
         def func(Q):
             with Q.parallel():
+                Q.Foo(1, 2, 3)
+                Q.Bar(1, 2, 3)
+
+        text = "prepare_all; <Foo 1 2 3|Bar 1 2 3>; measure_all"
+        self.run_test(func, text)
+
+    def test_parallel_block_noparen(self):
+        @circuit
+        def func(Q):
+            with Q.parallel:
                 Q.Foo(1, 2, 3)
                 Q.Bar(1, 2, 3)
 
@@ -223,6 +243,21 @@ class QsyntaxTester(unittest.TestCase):
     def test_global_sequential_function(self):
         """Test a function outside a circuit with a circuit.sequential decorator."""
 
+        @circuit.sequential()
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_global_sequential_function_noparen(self):
+        """Test a function outside a circuit with a circuit.sequential decorator."""
+
         @circuit.sequential
         def make_body(Q, r):
             Q.Foo(r[0])
@@ -233,6 +268,156 @@ class QsyntaxTester(unittest.TestCase):
             Q.make_body(r)
 
         text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_parallel_function(self):
+        """Test using a function with a Q.parallel decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.parallel
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        self.run_test(func, text)
+
+    def test_global_parallel_function(self):
+        """Test a function outside a circuit with a circuit.parallel decorator."""
+
+        @circuit.parallel()
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        self.run_test(func, text)
+
+    def test_global_parallel_function_noparen(self):
+        """Test a function outside a circuit with a circuit.parallel decorator."""
+
+        @circuit.parallel
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        self.run_test(func, text)
+
+    def test_subcircuit_function(self):
+        """Test using a function with a Q.subcircuit decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.subcircuit
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; subcircuit {Foo r[0]}"
+        self.run_test(func, text)
+
+    def test_subcircuit_function_with_arg(self):
+        """Test using a function with a Q.subcircuit decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.subcircuit(42)
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; subcircuit 42 {Foo r[0]}"
+        self.run_test(func, text)
+
+    def test_global_subcircuit_function(self):
+        """Test a function outside a circuit with a circuit.subcircuit decorator."""
+
+        @circuit.subcircuit()
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; subcircuit {Foo r[0]}"
+        self.run_test(func, text)
+
+    def test_global_subcircuit_function_noparen(self):
+        """Test a function outside a circuit with a circuit.subcircuit decorator."""
+
+        @circuit.subcircuit
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; subcircuit {Foo r[0]}"
+        self.run_test(func, text)
+
+    def test_global_subcircuit_function_with_arg(self):
+        """Test a function outside a circuit with a circuit.subcircuit decorator."""
+
+        @circuit.subcircuit(42)
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; subcircuit 42 {Foo r[0]}"
+        self.run_test(func, text)
+
+    def test_loop_function(self):
+        """Test using a function with a Q.loop decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.loop(5)
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; loop 5 {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_global_loop_function(self):
+        """Test a function outside a circuit with a circuit.loop decorator."""
+
+        @circuit.loop(10)
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; loop 10 {Foo r[0]}; measure_all"
         self.run_test(func, text)
 
     def run_test(self, func, text, *args, inject_pulses=None):

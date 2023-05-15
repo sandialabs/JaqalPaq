@@ -8,20 +8,79 @@ import functools
 from typing import Any
 from inspect import getfullargspec
 
+try:
+    from contextlib import _GeneratorContextManager
+except ImportError as exc:
+    import sys
+
+    raise ImportError(
+        f"JaqalPaq: You are using Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}, which does not have the internal _GeneratorContextManager required by this module"
+    ) from exc
+
 from jaqalpaq.error import JaqalError
 from jaqalpaq.core.circuitbuilder import build
-from jaqalpaq.run import run_jaqal_circuit
-from jaqalpaq.generator import generate_jaqal_program
 
 
 class CircuitInterface:
     def __init__(self):
         self._blocks = {}
 
-    def sequential(self, func):
+    def clear(self):
+        """Remove any stored function blocks. Mostly useful for unit testing,
+        but could also be useful in a notebook."""
+        self._blocks = {}
+
+    @property
+    def sequential(self):
         """Decorator that registers a function as a sequential block that can
         be inserted later."""
+        return DecoratorOrContext(self._sequential_decorator, self._sequential_context)
+
+    def _sequential_decorator(self, func):
         _add_block(self._blocks, func, "sequential")
+        return func
+
+    def _sequential_context(self):
+        raise JaqalError(f"Use the Q object to open a sequential context")
+
+    @property
+    def parallel(self):
+        """Decorator that registers a function as a parallel block that can
+        be inserted later."""
+        return DecoratorOrContext(self._parallel_decorator, self._parallel_context)
+
+    def _parallel_decorator(self, func):
+        _add_block(self._blocks, func, "parallel")
+        return func
+
+    def _parallel_context(self):
+        raise JaqalError(f"Use the Q object to open a parallel context")
+
+    @property
+    def subcircuit(self):
+        """Decorator that registers a function as a subcircuit block that can
+        be inserted later."""
+        return DecoratorOrContext(self._subcircuit_decorator, self._subcircuit_context)
+
+    def _subcircuit_decorator(self, func, argument=1):
+        _add_block(self._blocks, func, "subcircuit", argument)
+        return func
+
+    def _subcircuit_context(self, *args):
+        raise JaqalError(f"Use the Q object to open a subcircuit context")
+
+    @property
+    def loop(self):
+        """Decorator that registers a function as a loop that can be inserted
+        later."""
+        return DecoratorOrContext(self._loop_decorator, self._loop_context)
+
+    def _loop_decorator(self, func, repeats):
+        _add_block(self._blocks, func, "loop", repeats)
+        return func
+
+    def _loop_context(self, *args):
+        raise JaqalError(f"Use the Q object to open a loop context")
 
     def __call__(
         self,
@@ -100,14 +159,14 @@ class Q:
 
         return QGate(name, self._stack)
 
-    def _make_block(self, func, context_name):
+    def _make_block(self, func, context_name, *ctxargs):
         """Create a block from a function that was stored earlier."""
 
         context = getattr(self, context_name)
 
-        def do_block(*args):
-            with context():
-                func(self, *args)
+        def do_block(*funcargs):
+            with context(*ctxargs):
+                func(self, *funcargs)
 
         return do_block
 
@@ -137,37 +196,64 @@ class Q:
         self._stack.set_let(let)
         return let
 
-    @contextmanager
-    def loop(self, repeats):
+    @property
+    def loop(self):
+        """Mark a block or function as representing a Jaqal loop."""
+        return DecoratorOrContext(self._loop_decorator, self._loop_context)
+
+    def _loop_decorator(self, func, repeats):
+        _add_block(self._blocks, func, "loop", repeats)
+        return func
+
+    def _loop_context(self, repeats):
         with self._stack.frame():
             yield
             loop = QLoop.from_stack(self._stack, argument=repeats)
-
         self._stack.set_statement(loop)
 
-    def sequential(self, func=None):
-        """When used as a context, open a new sequential block. When used as a
-        decorator, register a sequential block that can be inserted later."""
-        if func is not None:
-            _add_block(self._blocks, func, "sequential")
-        return self._sequential_context()
+    @property
+    def sequential(self):
+        """Mark a block or function as representing a Jaqal sequential
+        block."""
+        return DecoratorOrContext(self._sequential_decorator, self._sequential_context)
 
-    @contextmanager
+    def _sequential_decorator(self, func):
+        _add_block(self._blocks, func, "sequential")
+        return func
+
     def _sequential_context(self):
         with self._stack.frame():
             yield
             block = QSequentialBlock.from_stack(self._stack)
         self._stack.set_statement(block)
 
-    @contextmanager
+    @property
     def parallel(self):
+        """Mark a block or function as representing a Jaqal parallel
+        block."""
+        return DecoratorOrContext(self._parallel_decorator, self._parallel_context)
+
+    def _parallel_decorator(self, func):
+        _add_block(self._blocks, func, "parallel")
+        return func
+
+    def _parallel_context(self):
         with self._stack.frame():
             yield
             block = QParallelBlock.from_stack(self._stack)
         self._stack.set_statement(block)
 
-    @contextmanager
-    def subcircuit(self, argument=1):
+    @property
+    def subcircuit(self):
+        """Mark a block or function as representing a Jaqal subcircuit
+        block."""
+        return DecoratorOrContext(self._subcircuit_decorator, self._subcircuit_context)
+
+    def _subcircuit_decorator(self, func, argument=1):
+        _add_block(self._blocks, func, "subcircuit", argument)
+        return func
+
+    def _subcircuit_context(self, argument=1):
         with self._stack.frame():
             yield
             block = QSubcircuitBlock.from_stack(self._stack, argument=argument)
@@ -689,7 +775,7 @@ def is_qcircuit(func, argcount=None):
     return True
 
 
-def _add_block(blocks, func, source):
+def _add_block(blocks, func, source, *args):
     """Add a function block to a dictionary of stored blocks."""
     if not callable(func):
         raise JaqalError(
@@ -704,4 +790,120 @@ def _add_block(blocks, func, source):
     # behavior in general. Also, there are times when it is desirable,
     # such as locally overriding a block, or iterating on a circuit in
     # a Jupyter notebook without reloading the kernel.
-    blocks[func_name] = (func, source)
+    blocks[func_name] = (func, source, *args)
+
+
+class DecoratorOrContext:
+    """(internal) Create an object that can decorate a function or serve
+    as a context for a with-statement. This allows a single property
+    of a class to serve as both a decorator for functions and a
+    context that can be opened. Additionally, it simplifies decorators
+    so omitting their argument list is the same as providing an empty
+    argument list. Decorators may take additional positional and
+    keyword arguments.
+
+    """
+
+    def __init__(self, decorator, ctx_func):
+        """Set up our context actions and decorator.
+
+        ctx_func must be a generator in the style of a contextmanager,
+        but not decorated with that decorator.
+
+        The decorator must take the function to decorate as its first
+        argument, then can take any additional arguments after. The
+        additional arguments are drawn from the decorator's--not the
+        function's--argument list.
+
+        """
+
+        self.ctx_func = ctx_func
+        self.decorator = decorator
+
+        self._args = []
+        self._kwargs = {}
+
+        self._cm = None
+
+    def __call__(self, *args, **kwargs):
+        # Let's consider the different ways this class can be used:
+        #
+        # 1) Are we a decorator?
+        # 1a) Are we a decorator with arguments (including an empty arg list)?
+        # 1b) Are we a decorator without arguments?
+        # 2) Are we a context?
+        # 2a) Are we a context with arguments (including an empty arg list)?
+        # 2b) Are we a context without arguments?
+        #
+        # For simplicity, we assume that if our context function or
+        # decorator takes positional arguments, the first one cannot
+        # be a callable object. This allows us to make decisions about
+        # whether we are called with and without arguments based on
+        # the presence of a single function argument.
+        #
+        # We can immediately know we are not in case 2b because the
+        # context protocol would be invoked immediately and we would
+        # be in the __enter__ method.
+        #
+        # If our first argument is a function, then we are in case 1b
+        # or we have recursed. Either way, decorate the function with
+        # our stored args.
+        #
+        # Otherwise, collect the arguments, and recurse. The behavior
+        # is initially the same for cases 1a and 2a.
+
+        if len(args) == 1 and callable(args[0]) and not kwargs:
+            # Decorate the callable function. We are in case 1b or we
+            # have already recursed and are in 1a.
+            func = args[0]
+            wrapped = self.decorator(func, *self._pop_args(), **self._pop_kwargs())
+            functools.wraps(func)(wrapped)
+            return wrapped
+        else:
+            # This assertion can only happen if this internal class is
+            # used improperly. When actually used as a decorator or
+            # context there is no way to recurse more than once.
+            assert not self._args and not self._kwargs
+
+            # Store our arguments and recurse. We are in case 1a or 2a.
+            self._set_args(args)
+            self._set_kwargs(kwargs)
+            return self
+
+    def __enter__(self):
+        # Remove references to what is passed to the context manager.
+        self._cm = _GeneratorContextManager(
+            self.ctx_func, self._pop_args(), self._pop_kwargs()
+        )
+        self.ctx_func = None
+        return self._cm.__enter__()
+
+    def __exit__(self, *args):
+        assert self._cm, "Internal context manager not properly intialized"
+        _cm = self._cm
+        self._cm = None
+        return _cm.__exit__(*args)
+
+    def _set_args(self, args):
+        if self._args is None:
+            raise JaqalError(f"DecoratorOrContext object reused")
+        self._args = args
+
+    def _pop_args(self):
+        if self._args is None:
+            raise JaqalError(f"DecoratorOrContext object reused")
+        args = self._args
+        self._args = None
+        return args
+
+    def _set_kwargs(self, kwargs):
+        if self._kwargs is None:
+            raise JaqalError(f"DecoratorOrContext object reused")
+        self._kwargs = kwargs
+
+    def _pop_kwargs(self):
+        if self._kwargs is None:
+            raise JaqalError(f"DecoratorOrContext object reused")
+        kwargs = self._kwargs
+        self._kwargs = None
+        return kwargs
