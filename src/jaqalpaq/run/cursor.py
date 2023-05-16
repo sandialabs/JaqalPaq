@@ -23,6 +23,15 @@ class SubcircuitCursor:
         self._loop_stack = []
         self._do_initialize()
 
+    @classmethod
+    def terminal_cursor(klass, end):
+        ret = klass.__new__(klass)
+        ret._locus = end
+        ret._end = end
+        ret._loop_stack = []
+        ret._state = State.final_measurement
+        return ret
+
     @property
     def locus(self):
         return self._locus
