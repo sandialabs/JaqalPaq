@@ -9,6 +9,7 @@ from .visitor import Visitor
 from jaqalpaq.core.locus import Locus
 from jaqalpaq.error import JaqalError
 from jaqalpaq.core.block import BlockStatement, LoopStatement
+from jaqalpaq.core.branch import BranchStatement
 
 
 class Trace:
@@ -157,6 +158,26 @@ class DiscoverSubcircuits(UsedQubitIndicesVisitor):
         current.used_qubits = self.qubits
         self.subcircuits.append(current)
         self.current = None
+
+
+def discover_subcircuits(circuit):
+    ds = DiscoverSubcircuits()
+    for tr in ds.visit(circuit):
+        locus = Locus.from_address(circuit, tr.start)
+        if tr.start != tr.end:
+            end_locus = Locus.from_address(circuit, tr.end)
+        else:
+            end_locus = locus
+        last = False
+        for parent in locus.lineage:
+            if last:
+                raise JaqalError("Cannot nest subcircuit in any other block")
+            obj = parent.object
+            if isinstance(obj, BranchStatement):
+                raise JaqalError("Cannot start subcircuit inside a branch")
+            elif isinstance(obj, BlockStatement) and obj.subcircuit:
+                last = True
+        yield locus, end_locus
 
 
 class CircuitWalker(Visitor):
