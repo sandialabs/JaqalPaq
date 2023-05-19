@@ -328,7 +328,7 @@ class Readout:
     @property
     def subcircuit(self):
         """Return the associated prepare_all/measure_all block in the parent circuit."""
-        return self._subcircuit
+        return DeprecatedSubcircuitView(self._result, self._subcircuit)
 
     @property
     def as_int(self):
