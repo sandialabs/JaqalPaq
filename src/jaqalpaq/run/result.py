@@ -631,11 +631,10 @@ class SubcircuitResult:
     @property
     def measured_qubits(self):
         """A list of the qubits that are measured, in their display order."""
-        try:
-            (reg,) = self.filled_circuit.registers.values()
-        except ValueError as exc:
-            raise JaqalError("Circuits must have exactly one register") from exc
-        return list(reg)
+        qubits = []
+        for reg in self.filled_circuit.registers.values():
+            qubits.extend(reg)
+        return reg
 
     def _repr_pretty_(self, printer, cycle=False):
         printer.text(f"<SubcircuitResult {self._index}@{self._start} of ")
