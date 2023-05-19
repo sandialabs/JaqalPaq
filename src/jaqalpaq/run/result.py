@@ -879,6 +879,10 @@ class DeprecatedSubcircuitView(SubcircuitView, BackwardsCompatibleView):
         # Readouts came as an actual list
         return self.result._attributes["readouts"][self.subbatch_i][self.index]
 
+    @property
+    def measured_qubits(self):
+        return self._subcircuit.measured_qubits
+
 
 class AttributeView:
     __slots__ = ("attribute", "attribute_name", "_subcircuit")
