@@ -1,0 +1,11 @@
+ARG FROM_IMAGE
+FROM $FROM_IMAGE
+ARG PIP_INDEX_URL http_proxy no_proxy pygsti_version
+
+RUN --mount=type=bind,target=/repos --mount=type=cache,target=/root/.cache/pip,id=pipcache \
+    export DEBIAN_FRONTEND=noninteractive && \
+    apt-get update && apt-get install -y libeatmydata1 && export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so && \
+    pip install --upgrade pip && \
+    pip install --no-binary pyGSTi \
+        scipy matplotlib ipykernel jupyterlab jupyter "pyGSTi==${pygsti_version}" && \
+    apt-get clean && rm -fr /var/lib/apt/lists/*

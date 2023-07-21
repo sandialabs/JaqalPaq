@@ -1,0 +1,7 @@
+ARG FROM_IMAGE
+FROM $FROM_IMAGE
+ARG PIP_INDEX_URL http_proxy no_proxy
+
+RUN --mount=type=bind,target=/repos --mount=type=tmpfs,target=/tmp --mount=type=cache,target=/root/.cache/pip,id=pipcache \
+    export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so && \
+    pip install /repos/build/*.whl

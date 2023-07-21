@@ -1,68 +1,73 @@
-image: python:3.7
+stages:
+    - prepare
+    - build
+    - test
 
 variables:
-  TEST_REPRODUCE: $TEST_REPRODUCE
-  RELEASE: $RELEASE
-  QSCOUT_BRANCH: $QSCOUT_BRANCH
-  JAQALPAQ_EXTRAS_BRANCH: $JAQALPAQ_EXTRAS_BRANCH
-  JAQALPAW_BRANCH: $JAQALPAW_BRANCH
-  PYGSTI_COMMIT: $PYGSTI_COMMIT
+  GIT_STRATEGY: none
 
-before_script:
-  - python --version
-  - if [ "${PYGSTI_COMMIT}" != "NONE" ] ; then
-        cd .. ;
-        ls -l ;
-        export LOCAL_PYGSTI="./pyGSTi" ;
-        [ -d pyGSTi ] || git clone "https://github.com/pyGSTio/pyGSTi.git" ;
-        cd pyGSTi ;
-        git --version ;
-        git ls-remote ;
-        git reset --hard HEAD ;
-        git fetch -p -t -f -v --all ;
-        git ls-remote origin ;
-        git status ;
-        git checkout --detach "${PYGSTI_COMMIT}" ;
-        git clean -x -f -d ;
-        cd ../jaqalpaq ;
-    fi
-  - if echo "$CI_PROJECT_URL" | grep -q cee-gitlab.sandia.gov ; then
-        ( repo="https://nexus.web.sandia.gov/repository/pypi-proxy/simple" &&
-        pip config set global.index "$repo" &&
-        pip config set global.index-url "$repo" &&
-        echo -e '[easy_install]\nindex_url = '"${repo}" >~/.pydistutils.cfg );
-        unset https_proxy ;
-    fi
-  - pip install --upgrade pip wheel
 
-stages:
-  - Analysis and Tests
-  - Reproducibility
-  - Release
-
-Unified Tests:
-  stage: Analysis and Tests
+Prepare source:
+  stage: prepare
+  image: python:${PYTHON_VERSION}
   script:
-    - git fetch origin master
-    - if ! git diff --check origin/master HEAD ; then echo "See above whitespace errors." ; exit 1; fi
+    - (cd jaqalpaq 2>/dev/null && git fetch && git switch --detach "$CI_COMMIT_BRANCH") || git clone "$CI_REPOSITORY_URL" -b "$CI_COMMIT_BRANCH"
+    - PROJECT_URL="$(printf '%s' "${CI_REPOSITORY_URL}"|sed 's#/jaqalpaq.git$##')"
+    - cd jaqalpaq
+    - PYGSTI_VERSION="$(<setup.cfg grep -oP '(?<=^pygsti-integration = pyGSTi==).*(?=$)')"
+    - if ! git diff --check $(git merge-base origin/master HEAD) HEAD ; then echo "See above whitespace errors." ; exit 1; fi
     - if find . -iname '*.py' -exec grep -l -P '\t' {} + ; then echo 'Above files have tabs.' ; exit 1 ; fi
     - devel/refresh-data-files setup.cfg.new
     - if ! diff -q setup.cfg.new setup.cfg ; then
         echo "Run devel/refresh-data-files to refresh examples list." ;
         exit 1 ;
       fi
-    - pip install black~=23.1
+    - pip install black~=23.1 build
     - black --check .
     - cd ..
-    - rm -fr qscout-gatemodels
-    - git clone --depth 1 "$(echo "${CI_REPOSITORY_URL}" | sed 's/jaqalpaq.git/qscout-gatemodels.git/')" -b "${QSCOUT_BRANCH}"
-    - LOCAL_JAQALPAQ=./jaqalpaq LOCAL_JAQALPAQ_EXTRAS="" LOCAL_QSCOUT_GATEMODELS=./qscout-gatemodels
-      JAQALPAQ_OPTS="pygsti-integration,tests"
-      ./jaqalpaq/install.sh
-    - pip install pytest-cov
-    - cd jaqalpaq
-    - rm -f /tmp/ipc_test
-    - pytest --cov=src/ --cov=../qscout-gatemodels/src --cov-branch --cov-report=html
+    - (cd jaqalpaq-extras 2>/dev/null && git fetch && git switch --detach "$JAQALPAQ_EXTRAS_BRANCH") || git clone --depth 1 "${PROJECT_URL}/jaqalpaq-extras.git" -b "$JAQALPAQ_EXTRAS_BRANCH"
+    - (cd qscout-gatemodels 2>/dev/null && git fetch && git switch --detach "$QSCOUT_BRANCH") || git clone --depth 1 "${PROJECT_URL}/qscout-gatemodels.git" -b "$QSCOUT_BRANCH"
+    - (cd jaqalpaw 2>/dev/null && git fetch && git switch --detach "$JAQALPAW_BRANCH") || git clone --depth 1 "${PROJECT_URL}/jaqalpaw.git" -b "$JAQALPAW_BRANCH"
+    - cp -rt . jaqalpaq/devel
+    - mkdir build
+    - for pkg in jaqalpaq jaqalpaq-extras qscout-gatemodels jaqalpaw ; do
+        python3 -m build -o build $pkg || exit 1 ;
+      done
+    - echo $PYGSTI_VERSION | tee build/pygsti_version
+  artifacts:
+    paths:
+      - build
+      - devel
+    expire_in: 1 hour
+
+
+Build Image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  dependencies:
+    - Prepare source
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - mkdir ~/.docker && printf '%s' "$DOCKER_AUTH_CONFIG" >~/.docker/config.json
+    - if [ -z "$DOCKER_IMAGE" ] ; then DOCKER_IMAGE="$(printf '%s' "$CI_COMMIT_REF_NAME" | sed 's#/#-#g')" ; fi
+    - BASE_IMAGE_FULL="${DOCKER_REPO}jaqal-base:${BASE_IMAGE}"
+    - if [ -n "$BUILD_BASE" ] || ! docker pull "$BASE_IMAGE_FULL" ; then
+        { docker build -f devel/Dockerfile.base --build-arg FROM_IMAGE=python:"$PYTHON_VERSION"
+          --build-arg PIP_INDEX_URL="$PIP_INDEX_URL" --build-arg http_proxy="$http_proxy" --build-arg no-proxy="$no_proxy"
+          --build-arg pygsti_version="$(cat build/pygsti_version)" --tag "$BASE_IMAGE_FULL" . &&
+        docker push "$BASE_IMAGE_FULL" ; } || exit 1 ;
+      fi
+    - JAQAL_IMAGE_FULL="${DOCKER_REPO}jaqalpaq:${DOCKER_IMAGE}"
+    - docker build -f devel/Dockerfile.jaqal --build-arg FROM_IMAGE="$BASE_IMAGE_FULL"
+        --build-arg PIP_INDEX_URL="$PIP_INDEX_URL" --build-arg http_proxy="$http_proxy" --build-arg no-proxy="$no_proxy"
+        --tag "$JAQAL_IMAGE_FULL" .
+    - docker push "$JAQAL_IMAGE_FULL"
+    - <devel/run_tests docker run --name "run_tests" -e PYTHON_VERSION -e no_proxy -e http_proxy -e PIP_INDEX_URL -i "$JAQAL_IMAGE_FULL" /bin/sh
+    - mkdir htmlcov
+    - docker cp run_tests:/htmlcov - | tar -xC htmlcov
   artifacts:
     when: always
     paths:
@@ -71,7 +76,10 @@ Unified Tests:
 
 
 Notebooks:
-  stage: Reproducibility
+  stage: test
+  image: python:3.7
+  variables:
+      GIT_STRATEGY: fetch
   only:
     variables:
       - $TEST_REPRODUCE == "1"
@@ -108,36 +116,4 @@ Notebooks:
     when: always
     paths:
       - executed-notebooks.tar
-    expire_in: 1 week
-
-Packaging:
-  stage: Release
-  only:
-    variables:
-      - $RELEASE == "1"
-  script:
-    - git fetch origin master
-    - cd ..
-    - rm -fr qscout-gatemodels jaqalpaq-extras jaqalpaw
-    - git clone --depth 1 "$(echo "${CI_REPOSITORY_URL}" | sed 's/jaqalpaq.git/qscout-gatemodels.git/')" -b "${QSCOUT_BRANCH}"
-    - git clone --depth 1 "$(echo "${CI_REPOSITORY_URL}" | sed 's/jaqalpaq.git/jaqalpaq-extras.git/')" -b "${JAQALPAQ_EXTRAS_BRANCH}"
-    - git clone --depth 1 "$(echo "${CI_REPOSITORY_URL}" | sed 's/jaqalpaq.git/jaqalpaw.git/')" -b "${JAQALPAW_BRANCH}"
-    - rm -fr /tmp/build-jaqal
-    - pip install build
-    - jaqalpaq/devel/build
-    - rm -f jaqalpaq/packages.tar
-    - tar -cf jaqalpaq/packages.tar -C /tmp/build-jaqal dist
-    - rm -fr /tmp/jaqal-test-venv
-    - python3 -m venv /tmp/jaqal-test-venv
-    - source /tmp/jaqal-test-venv/bin/activate
-    - cd /tmp/build-jaqal/dist
-    - pip install $(echo ./JaqalPaq-*.whl)'[pygsti-integration]' ./JaqalPaq_extras-*.whl $(echo ./JaqalPaw-*.whl)'[tests]' ./QSCOUT_gatemodels-*.whl
-    - ( cd /tmp/jaqal-test-venv/share/jaqalpaq && pytest . )
-    - ( cd /tmp/jaqal-test-venv/share/jaqalpaw && pytest . )
-    - ( cd /tmp/jaqal-test-venv/share/qscout-gatemodels && pytest . )
-    - rm -fr /tmp/jaqal-test-venv
-  artifacts:
-    when: always
-    paths:
-      - packages.tar
     expire_in: 1 week
