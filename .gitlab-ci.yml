@@ -77,14 +77,14 @@ Build Image:
 
 Notebooks:
   stage: test
-  image: python:3.7
+  image: python:$PYTHON_VERSION
   only:
     variables:
       - $TEST_REPRODUCE == "1"
   dependencies:
     - Prepare source
   script:
-    - pip install matplotlib==3.5.2 "$(echo -n build/JaqalPaq-*.whl)[pygsti-integration,notebooks]" build/QSCOUT_gatemodels-*.whl nbconvert ipykernel
+    - pip install matplotlib==3.7.2 "$(echo -n build/JaqalPaq-*.whl)[pygsti-integration,notebooks]" build/QSCOUT_gatemodels-*.whl nbconvert ipykernel
     - ipython kernel install --name=python3 --user
     - find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -exec devel/ipynb-execute {} --ExecutePreprocessor.kernel_name=python3 \;
     - find /usr/local/share/jaqalpaq/examples -name '*.nbconvert.ipynb' -print0 | xargs -0 tar -cf executed-notebooks.tar
