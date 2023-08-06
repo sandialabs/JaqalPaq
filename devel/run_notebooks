@@ -1,0 +1,22 @@
+#!/bin/sh
+set -ex
+
+pip install matplotlib==3.7.2 nbconvert openfermion pyscf openfermionpyscf
+ipython kernel install --name=python3 --user
+find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -exec devel/ipynb-execute {} --ExecutePreprocessor.kernel_name=python3 \;
+(cd /usr/local/share/jaqalpaq/ && find examples -name '*.nbconvert.ipynb' -print0 | xargs -0 tar -cf executed-notebooks.tar)
+mv /usr/local/share/jaqalpaq/executed-notebooks.tar .
+find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -print0 | (
+  didfail=0 ;
+  while IFS= read -r -d '' line ; do
+    newf="${line%%.ipynb}.nbconvert.ipynb" ;
+    if ! [ -f "$newf" ] ; then
+      didfail=1 ;
+      echo "${line} failed to build" ;
+    elif ! devel/ipynb-diff "${line}" "${newf}" -q ; then
+      didfail=1 ;
+      echo "${line} changed" ;
+    fi ;
+  done ;
+  exit "$didfail" ;
+)

@@ -1,7 +1,6 @@
 stages:
     - prepare
     - build
-    - test
 
 variables:
   GIT_STRATEGY: none
@@ -65,45 +64,20 @@ Build Image:
         --build-arg PIP_INDEX_URL="$PIP_INDEX_URL" --build-arg http_proxy="$http_proxy" --build-arg no-proxy="$no_proxy"
         --tag "$JAQAL_IMAGE_FULL" .
     - docker push "$JAQAL_IMAGE_FULL"
-    - <devel/run_tests docker run --name "run_tests" -e PYTHON_VERSION -e no_proxy -e http_proxy -e PIP_INDEX_URL -i "$JAQAL_IMAGE_FULL" /bin/sh
+    - <devel/run_tests docker run --name "run_tests" -e PYTHON_VERSION -e no_proxy -e http_proxy -e PIP_INDEX_URL -i "$JAQAL_IMAGE_FULL" /bin/bash
     - mkdir htmlcov
-    - docker cp run_tests:/htmlcov - | tar -xC htmlcov
+    - docker cp run_tests:/htmlcov .
+    - ret=0
+    - if [ "$TEST_REPRODUCE" = "1" ] ; then
+        { docker create -i --name "run_notebooks" -e PYTHON_VERSION -e no_proxy -e http_proxy -e PIP_INDEX_URL -i "$JAQAL_IMAGE_FULL" /bin/bash &&
+          docker cp devel run_notebooks:devel || exit 1 ; } ;
+        <devel/run_notebooks docker start -ai run_notebooks || ret=1 ;
+        docker cp run_notebooks:/executed-notebooks.tar . || exit 1 ;
+      fi
+    - exit $ret
   artifacts:
     when: always
     paths:
       - htmlcov
-    expire_in: 1 week
-
-
-Notebooks:
-  stage: test
-  image: python:$PYTHON_VERSION
-  only:
-    variables:
-      - $TEST_REPRODUCE == "1"
-  dependencies:
-    - Prepare source
-  script:
-    - pip install matplotlib==3.7.2 "$(echo -n build/JaqalPaq-*.whl)[pygsti-integration,notebooks]" build/QSCOUT_gatemodels-*.whl nbconvert ipykernel
-    - ipython kernel install --name=python3 --user
-    - find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -exec devel/ipynb-execute {} --ExecutePreprocessor.kernel_name=python3 \;
-    - find /usr/local/share/jaqalpaq/examples -name '*.nbconvert.ipynb' -print0 | xargs -0 tar -cf executed-notebooks.tar
-    - find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -print0 | (
-        didfail=0 ;
-        while IFS= read -r -d '' line ; do
-          newf="${line%%.ipynb}.nbconvert.ipynb" ;
-          if ! [ -f "$newf" ] ; then
-            didfail=1 ;
-            echo "${line} failed to build" ;
-          elif ! devel/ipynb-diff "${line}" "${newf}" -q ; then
-            didfail=1 ;
-            echo "${line} changed" ;
-          fi ;
-        done ;
-        exit "$didfail" ;
-      )
-  artifacts:
-    when: always
-    paths:
       - executed-notebooks.tar
     expire_in: 1 week
