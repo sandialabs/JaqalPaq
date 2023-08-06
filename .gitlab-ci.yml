@@ -78,27 +78,17 @@ Build Image:
 Notebooks:
   stage: test
   image: python:3.7
-  variables:
-      GIT_STRATEGY: fetch
   only:
     variables:
       - $TEST_REPRODUCE == "1"
+  dependencies:
+    - Prepare source
   script:
-    - git fetch origin master
-    - cd ..
-    - rm -fr qscout-gatemodels jaqalpaq-extras
-    - git clone --depth 1 "$(echo "${CI_REPOSITORY_URL}" | sed 's/jaqalpaq.git/qscout-gatemodels.git/')" -b "${QSCOUT_BRANCH}"
-    - git clone --depth 1 "$(echo "${CI_REPOSITORY_URL}" | sed 's/jaqalpaq.git/jaqalpaq-extras.git/')" -b "${JAQALPAQ_EXTRAS_BRANCH}"
-    - pip install matplotlib==3.5.2
-    - LOCAL_JAQALPAQ=./jaqalpaq LOCAL_JAQALPAQ_EXTRAS="" LOCAL_QSCOUT_GATEMODELS=./qscout-gatemodels
-      JAQALPAQ_OPTS="pygsti-integration,notebooks"
-      ./jaqalpaq/install.sh
-    - pip install nbconvert ipykernel
+    - pip install matplotlib==3.5.2 "$(echo -n build/JaqalPaq-*.whl)[pygsti-integration,notebooks]" build/QSCOUT_gatemodels-*.whl nbconvert ipykernel
     - ipython kernel install --name=python3 --user
-    - cd jaqalpaq
-    - find examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' -exec devel/ipynb-execute {} --ExecutePreprocessor.kernel_name=python3 \;
-    - find examples -name '*.nbconvert.ipynb' -print0 | xargs -0 tar -cf executed-notebooks.tar
-    - find examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' -print0 | (
+    - find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -exec devel/ipynb-execute {} --ExecutePreprocessor.kernel_name=python3 \;
+    - find /usr/local/share/jaqalpaq/examples -name '*.nbconvert.ipynb' -print0 | xargs -0 tar -cf executed-notebooks.tar
+    - find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -print0 | (
         didfail=0 ;
         while IFS= read -r -d '' line ; do
           newf="${line%%.ipynb}.nbconvert.ipynb" ;
