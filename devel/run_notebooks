@@ -1,6 +1,10 @@
 #!/bin/sh
 set -ex
 
+if ! grep -q 'B3LYP_WITH_VWN5' "${PYSCF_CONFIG_FILE=$HOME/.pyscf_conf.py}" 2>/dev/null ; then
+    echo "B3LYP_WITH_VWN5 = True" >>"${PYSCF_CONFIG_FILE}"
+    echo "WARNING: Setting 'B3LYP_WITH_VWN5 = True' in \"${PYSCF_CONFIG_FILE}\""
+fi
 pip install matplotlib==3.7.2 nbconvert openfermion pyscf openfermionpyscf
 ipython kernel install --name=python3 --user
 find /usr/local/share/jaqalpaq/examples -name '*.ipynb' ! -name '*.nbconvert.ipynb' ! -name 'Transpiler_Demo.ipynb' -exec devel/ipynb-execute {} --ExecutePreprocessor.kernel_name=python3 \;
