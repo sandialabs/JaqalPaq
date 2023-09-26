@@ -2,7 +2,17 @@
 # Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains
 # certain rights in this software.
 
+import warnings
 from jaqalpaq.error import JaqalError
+
+# This is the number of times each subcircuit is run to gather statistics
+#
+# This global setting does not reflect the typical behavior of QSCOUT hardware,
+# which is by default closer to 1000 repeats.  Changing it here, however,
+# breaks API, so we must wait until 2.0 to change this default.
+#
+# You can also control this by setting the __repeats__ override.
+DEFAULT_NUM_REPEATS = 1
 
 
 class BlockStatement:
@@ -21,12 +31,22 @@ class BlockStatement:
     :type statements: list(GateStatement, LoopStatement, BlockStatement)
     """
 
-    def __init__(self, parallel=False, subcircuit=False, iterations=1, statements=None):
+    def __init__(
+        self, parallel=False, subcircuit=False, iterations=None, statements=None
+    ):
         self._parallel = bool(parallel)
         self._subcircuit = bool(subcircuit)
-        self._iterations = iterations
-        if not self._subcircuit and self._iterations != 1:
-            raise JaqalError("Only subcircuits may have iterations != 1")
+        if subcircuit:
+            if iterations is None:
+                iterations = DEFAULT_NUM_REPEATS
+            self._iterations = iterations
+        else:
+            if iterations is not None:
+                if iterations != 1:
+                    raise JaqalError("Only subcircuits may have iterations != 1")
+            else:
+                iterations = 1
+            self._iterations = iterations
         if statements is None:
             self._statements = []
         else:

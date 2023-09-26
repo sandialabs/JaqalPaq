@@ -945,12 +945,9 @@ class CircuitIndexView:
             assert start_obj.subcircuit
             shots = start_obj.iterations
         else:
-            # This global setting does not reflect the typical behavior of
-            # QSCOUT hardware, which is by default much closer to 100
-            # repeats.  Changing it here, however, breaks API, so we will
-            # wait until 2.0 to set this to a more reasonable default.
-            # You can control this by setting the __repeats__ override.
-            shots = 1
+            from jaqalpaq.core.block import DEFAULT_NUM_REPEATS
+
+            shots = DEFAULT_NUM_REPEATS
         return shots
 
     @property

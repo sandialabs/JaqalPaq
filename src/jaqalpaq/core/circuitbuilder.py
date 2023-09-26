@@ -333,7 +333,9 @@ class Builder:
             statements = [self.build(arg, context, gate_context) for arg in args[1:]]
             count = args[0]
             if count == "":
-                built_count = 1
+                from jaqalpaq.core.block import DEFAULT_NUM_REPEATS
+
+                built_count = DEFAULT_NUM_REPEATS
             else:
                 built_count = self.build(count, context, gate_context)
         return BlockStatement(
