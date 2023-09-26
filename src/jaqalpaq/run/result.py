@@ -739,7 +739,27 @@ class BackwardsCompatibleView:
         return self._subcircuit._pygsti_model
 
 
-class SubcircuitView:
+class DeprecatedFunctionsMixin:
+    @property
+    def probability_by_int(self):
+        """Do not use probability_by_int, it is deprecated.
+
+        Instead, use normalized_counts.by_int_dense, and set
+        repeats to 1000, either by using an overrides dictionary,
+        or setting jaqalpaq.run.result.DEFAULT_NUM_REPEATS.
+        """
+        try:
+            import jaqalapp
+        except ImportError:
+            warnings.warn(DeprecatedFunctionsMixin.probability_by_int.__doc__)
+
+        if self._subcircuit.simulated:
+            return self.simulated_probabilities.by_int_dense
+        else:
+            return self.normalized_counts.by_int_dense
+
+
+class SubcircuitView(DeprecatedFunctionsMixin):
     def __init__(self, result, subcircuit):
         self._subcircuit = subcircuit
         self.result = result
@@ -851,7 +871,7 @@ class SubcircuitView:
                 return self.instance.by_time[i].conditional_normalized_counts
 
 
-class DeprecatedSubcircuitView(SubcircuitView, BackwardsCompatibleView):
+class DeprecatedSubcircuitView(BackwardsCompatibleView, SubcircuitView):
     class _relative_frequencies(CumulativeTreeAccessor):
         # The existing API collected all prior runs of the subcircuit and gave the
         # relative frequency of all of those runs.
@@ -912,7 +932,7 @@ class CITreeAccessor(AbstractTreeAccessor):
         return getattr(node, self.attrname)[self.instance.per_subcircuit_time_index]
 
 
-class CircuitIndexView:
+class CircuitIndexView(DeprecatedFunctionsMixin):
     def __init__(self, result, circuitindex, *, time_i=None):
         self.result = result
         self._ci = circuitindex
