@@ -17,6 +17,14 @@ from jaqalpaq.run import result
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend
 
 
+def emit_jaqal_for_hardware(circuit, overrides):
+    """(internal) Generate Jaqal appropriate for running on the hardware."""
+    jaqal = generate_jaqal_program(circuit)
+    if overrides:
+        jaqal = "".join((jaqal, "\n// OVERRIDES: ", json.dumps(overrides), "\n"))
+    return jaqal
+
+
 class IPCBackend(IndependentSubcircuitsBackend):
     def __init__(self, *, address=None, host_socket=None):
         super().__init__()
@@ -81,9 +89,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         return results
 
     def _ipc_protocol(self, circuit, overrides=None):
-        jaqal = generate_jaqal_program(circuit)
-        if overrides:
-            jaqal = "".join((jaqal, "\n// OVERRIDES: ", json.dumps(overrides), "\n"))
+        jaqal = emit_jaqal_for_hardware(circuit, overrides)
         sock = self.get_host_socket()
         results = self._communicate(sock, jaqal.encode())
 
