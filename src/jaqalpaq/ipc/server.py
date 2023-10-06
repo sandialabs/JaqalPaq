@@ -6,8 +6,12 @@ import socket, select, os, sys, time
 from contextlib import contextmanager
 from pathlib import Path
 import json
+import struct
+
 import numpy
+
 from jaqalpaq.parser import parse_jaqal_string
+
 
 BLOCK_SIZE = 4096  # size recommended by Python docs
 POLLING_TIMEOUT = 0.1
@@ -15,17 +19,19 @@ POLLING_TIMEOUT = 0.1
 
 def ipc_protocol_read(conn):
     resp_list = []
-    started = False
     while True:
         events = select.select([conn], [], [conn], POLLING_TIMEOUT)
         if any(events):
-            packet = conn.recv(BLOCK_SIZE)
-            if packet:
-                resp_list.append(packet.decode())
-                started = True
-                continue
+            break
 
-        if started:
+    lenbytes = conn.recv(4)
+    (length,) = struct.unpack("!I", lenbytes)
+    while length > 0:
+        packet = conn.recv(min(length, BLOCK_SIZE))
+        if packet:
+            resp_list.append(packet.decode())
+            length -= len(packet)
+        else:
             break
 
     return "".join(resp_list)
@@ -52,7 +58,10 @@ def ipc_protocol_write(conn, exe_res):
     for exp in exe_res.by_time:
         results.append(list(exp.normalized_counts.by_int_dense))
 
-    return conn.send(json.dumps(results).encode())
+    data = json.dumps(results).encode()
+    length = struct.pack("!I", len(data))
+    conn.send(length)
+    return conn.send(data)
 
 
 @contextmanager

@@ -60,7 +60,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         return self._host_socket
 
     def _communicate(self, socket, data):
-        socket.send(struct.pack('!I', len(data)))
+        socket.send(struct.pack("!I", len(data)))
         socket.send(data)
 
         # The response is serialized JSON. Each entry in the array is a measurement
@@ -82,7 +82,7 @@ class IPCBackend(IndependentSubcircuitsBackend):
         if any(events):
             resp_list = []
             lenbytes = socket.recv(4)
-            length = struct.unpack('!I', lenbytes)
+            (length,) = struct.unpack("!I", lenbytes)
 
             while length > 0:
                 try:
