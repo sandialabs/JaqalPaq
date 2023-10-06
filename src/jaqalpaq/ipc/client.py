@@ -9,6 +9,8 @@ import math
 import os
 import socket, select
 import json
+import struct
+import time
 
 from jaqalpaq.error import JaqalError
 from jaqalpaq.generator import generate_jaqal_program
@@ -58,26 +60,45 @@ class IPCBackend(IndependentSubcircuitsBackend):
         return self._host_socket
 
     def _communicate(self, socket, data):
+        socket.send(struct.pack('!I', len(data)))
         socket.send(data)
 
         # The response is serialized JSON. Each entry in the array is a measurement
         # in the Jaqal file, and each entry in those entries represents
-        resp_list = []
-        polling_timeout = 0.1
-        started = False
-        while True:
+        long_timeout = 600  # wait 10 minutes for a response
+        polling_timeout = 1  # Be responsive to e.g. ctrl-c
+        start_time = time.time()
+
+        events = None
+
+        while time.time() - start_time < long_timeout:
             block_size = 4096  # size recommended by Python docs
             events = select.select([socket], [], [socket], polling_timeout)
             if any(events):
-                packet = socket.recv(block_size)
-                if packet:
-                    resp_list.append(packet.decode())
-                    started = True
-                    continue
-
-            if started:
                 break
-        resp_text = "".join(resp_list)
+
+        resp_text = None
+
+        if any(events):
+            resp_list = []
+            lenbytes = socket.recv(4)
+            length = struct.unpack('!I', lenbytes)
+
+            while length > 0:
+                try:
+                    packet = socket.recv(block_size)
+                except Exception as exc:
+                    raise JaqalError(f"Error while receiving response: {exc}") from exc
+                if not packet:
+                    raise JaqalError(f"Did not receive full response")
+                length -= len(packet)
+                resp_list.append(packet.decode())
+
+            assert length == 0, "Wrong amount read"
+
+            resp_text = "".join(resp_list)
+        else:
+            raise JaqalError(f"No response before timeout")
 
         # Deserialize the JSON into a list of lists of floats
         try:
