@@ -9,7 +9,6 @@ import math
 import os
 import socket, select
 import json
-import struct
 import time
 
 from jaqalpaq.error import JaqalError
@@ -17,6 +16,7 @@ from jaqalpaq.generator import generate_jaqal_program
 
 from jaqalpaq.run import result
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend
+from jaqalpaq.ipc.header import IpcHeader
 
 
 def emit_jaqal_for_hardware(circuit, overrides):
@@ -60,7 +60,8 @@ class IPCBackend(IndependentSubcircuitsBackend):
         return self._host_socket
 
     def _communicate(self, socket, data):
-        socket.send(struct.pack("!I", len(data)))
+        hdr = IpcHeader.from_body(data)
+        hdr.send(socket)
         socket.send(data)
 
         # The response is serialized JSON. Each entry in the array is a measurement
@@ -81,8 +82,8 @@ class IPCBackend(IndependentSubcircuitsBackend):
 
         if any(events):
             resp_list = []
-            lenbytes = socket.recv(4)
-            (length,) = struct.unpack("!I", lenbytes)
+            hdr = IpcHeader.recv(socket)
+            length = hdr.size
 
             while length > 0:
                 try:

@@ -6,11 +6,11 @@ import socket, select, os, sys, time
 from contextlib import contextmanager
 from pathlib import Path
 import json
-import struct
 
 import numpy
 
 from jaqalpaq.parser import parse_jaqal_string
+from jaqalpaq.ipc.header import IpcHeader
 
 
 BLOCK_SIZE = 4096  # size recommended by Python docs
@@ -24,8 +24,8 @@ def ipc_protocol_read(conn):
         if any(events):
             break
 
-    lenbytes = conn.recv(4)
-    (length,) = struct.unpack("!I", lenbytes)
+    hdr = IpcHeader.recv(conn)
+    length = hdr.size
     while length > 0:
         packet = conn.recv(min(length, BLOCK_SIZE))
         if packet:
@@ -59,8 +59,8 @@ def ipc_protocol_write(conn, exe_res):
         results.append(list(exp.normalized_counts.by_int_dense))
 
     data = json.dumps(results).encode()
-    length = struct.pack("!I", len(data))
-    conn.send(length)
+    hdr = IpcHeader.from_body(data)
+    hdr.send(conn)
     return conn.send(data)
 
 
