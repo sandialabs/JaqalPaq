@@ -1,5 +1,6 @@
 import struct
 
+
 class IpcHeader:
     """Represent information in the IPC protocol's header."""
 
@@ -23,7 +24,9 @@ class IpcHeader:
             raise RuntimeError("Could not read header")
         verbyte, size = struct.unpack(cls._encoding_str, raw)
         if verbyte != cls.version_byte:
-            raise ValueError(f"Version byte mismatch, expected 0x{cls.version_byte:x}, found 0x{verbyte:x}")
+            raise ValueError(
+                f"Version byte mismatch, expected 0x{cls.version_byte:x}, found 0x{verbyte:x}"
+            )
         return cls(size)
 
     def __init__(self, size):
@@ -41,4 +44,3 @@ class IpcHeader:
         count = sock.send(data)
         if count != self._encoding_size:
             raise RuntimeError("Could not send header")
-
