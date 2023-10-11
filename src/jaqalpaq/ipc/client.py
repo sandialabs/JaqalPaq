@@ -35,8 +35,13 @@ class IPCBackend(IndependentSubcircuitsBackend):
     # unlikely you will benefit from changing it.
     block_size = 4096
 
+    # Set this to NOT attempt any client connection, or data collection
+    DRY_RUN = False
+
     def __init__(self, *, address=None, host_socket=None):
         super().__init__()
+        if self.DRY_RUN:
+            return
         if host_socket is not None:
             self._host_socket = host_socket
             if address is not None:
@@ -123,6 +128,8 @@ class IPCBackend(IndependentSubcircuitsBackend):
 
     def _ipc_protocol(self, circuit, overrides=None):
         jaqal = emit_jaqal_for_hardware(circuit, overrides)
+        if self.DRY_RUN:
+            return
         sock = self.get_host_socket()
         results = self._communicate(sock, jaqal.encode())
 
@@ -139,6 +146,8 @@ class IPCBackend(IndependentSubcircuitsBackend):
         exe_res = result.ExecutionResult(circ, job.overrides)
 
         freqs = self._ipc_protocol(circ, job.overrides)
+        if self.DRY_RUN:
+            return exe_res
         parser = exe_res.accept_normalized_counts()
 
         parser.pass_data(freqs)
