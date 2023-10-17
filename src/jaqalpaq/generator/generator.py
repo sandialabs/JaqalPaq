@@ -14,6 +14,8 @@ from jaqalpaq.core import (
     AnnotatedValue,
 )
 
+from jaqalpaq.error import JaqalError
+
 
 def notate_slice(s):
     if s.step:
@@ -195,3 +197,4 @@ def generate_jaqal_value(val):
         return val.name
     elif isinstance(val, float) or isinstance(val, int):
         return format(_jaqal_value_numeric_context.create_decimal(repr(val)), "f")
+    raise JaqalError(f"Unexpected Jaqal circuit constituent: {val}")
