@@ -16,7 +16,7 @@ from jaqalpaq.generator import generate_jaqal_program
 
 from jaqalpaq.run import result
 from jaqalpaq.run.backend import IndependentSubcircuitsBackend
-from jaqalpaq.ipc.header import IpcHeader
+from jaqalpaq.ipc.header import IPCHeader
 
 
 def emit_jaqal_for_hardware(circuit, overrides):
@@ -28,6 +28,15 @@ def emit_jaqal_for_hardware(circuit, overrides):
 
 
 class IPCBackend(IndependentSubcircuitsBackend):
+    # How long to wait for a response from the HW or other component
+    # executing the circuit. In seconds.
+    long_timeout = 20 * 60
+
+    # Size, in bytes, that we read in at once when getting our
+    # results. This size is recommended by Python docs, and it is
+    # unlikely you will benefit from changing it.
+    block_size = 4096
+
     def __init__(self, *, address=None, host_socket=None):
         super().__init__()
         if host_socket is not None:
@@ -60,46 +69,28 @@ class IPCBackend(IndependentSubcircuitsBackend):
         return self._host_socket
 
     def _communicate(self, socket, data):
-        hdr = IpcHeader.from_body(data)
+        hdr = IPCHeader.from_body(data)
         hdr.send(socket)
         socket.send(data)
 
         # The response is serialized JSON. Each entry in the array is a measurement
-        # in the Jaqal file, and each entry in those entries represents
-        long_timeout = 600  # wait 10 minutes for a response
-        polling_timeout = 1  # Be responsive to e.g. ctrl-c
-        start_time = time.time()
+        # in the Jaqal file, and each entry in those entries represents a state
+        resp_list = []
+        hdr = IPCHeader.recv(socket)
+        if hdr is None:
+            raise JaqalError("Connection closed without sending results")
+        length = hdr.size
 
-        events = None
+        while length > 0:
+            packet = self._recv_responsive(socket, min(length, self.block_size))
+            if not packet:
+                raise JaqalError(f"Did not receive full response")
+            length -= len(packet)
+            resp_list.append(packet.decode())
 
-        while time.time() - start_time < long_timeout:
-            block_size = 4096  # size recommended by Python docs
-            events = select.select([socket], [], [socket], polling_timeout)
-            if any(events):
-                break
+        assert length == 0, "Wrong amount read"
 
-        resp_text = None
-
-        if any(events):
-            resp_list = []
-            hdr = IpcHeader.recv(socket)
-            length = hdr.size
-
-            while length > 0:
-                try:
-                    packet = socket.recv(block_size)
-                except Exception as exc:
-                    raise JaqalError(f"Error while receiving response: {exc}") from exc
-                if not packet:
-                    raise JaqalError(f"Did not receive full response")
-                length -= len(packet)
-                resp_list.append(packet.decode())
-
-            assert length == 0, "Wrong amount read"
-
-            resp_text = "".join(resp_list)
-        else:
-            raise JaqalError(f"No response before timeout")
+        resp_text = "".join(resp_list)
 
         # Deserialize the JSON into a list of lists of floats
         try:
@@ -109,6 +100,28 @@ class IPCBackend(IndependentSubcircuitsBackend):
             raise JaqalError(f"Bad response: {exc}") from exc
 
         return results
+
+    def _recv_responsive(self, socket, length):
+        """Receive up to length bytes while remaining responsive to
+        ctrl-c and other signals. Windows in particular will not wake
+        a process waiting on a network action with a signal and can
+        cause hard-to-kill processes in the case of an error without
+        this extra machinery."""
+
+        polling_timeout = 1
+        start_time = time.time()
+
+        while True:
+            events = select.select([socket], [], [socket], polling_timeout)
+            if any(events):
+                break
+            if time.time() - start_time < self.long_timeout:
+                raise JaqalError(f"No response before timeout")
+
+        try:
+            return socket.recv(length)
+        except Exception as exc:
+            raise JaqalError(f"Error while receiving response: {exc}") from exc
 
     def _ipc_protocol(self, circuit, overrides=None):
         jaqal = emit_jaqal_for_hardware(circuit, overrides)
