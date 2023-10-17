@@ -10,7 +10,7 @@ import json
 import numpy
 
 from jaqalpaq.parser import parse_jaqal_string
-from jaqalpaq.ipc.header import IpcHeader
+from jaqalpaq.ipc.header import IPCHeader
 
 
 BLOCK_SIZE = 4096  # size recommended by Python docs
@@ -24,7 +24,7 @@ def ipc_protocol_read(conn):
         if any(events):
             break
 
-    hdr = IpcHeader.recv(conn)
+    hdr = IPCHeader.recv(conn)
     length = hdr.size
     while length > 0:
         packet = conn.recv(min(length, BLOCK_SIZE))
@@ -59,7 +59,7 @@ def ipc_protocol_write(conn, exe_res):
         results.append(list(exp.normalized_counts.by_int_dense))
 
     data = json.dumps(results).encode()
-    hdr = IpcHeader.from_body(data)
+    hdr = IPCHeader.from_body(data)
     hdr.send(conn)
     return conn.send(data)
 
