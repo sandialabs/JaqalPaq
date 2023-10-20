@@ -2,6 +2,8 @@ import unittest
 
 from jaqalpaq.qsyntax import circuit
 from jaqalpaq.parser import parse_jaqal_string
+from jaqalpaq.core import GateDefinition, Parameter, ParamType
+from jaqalpaq.generator import generate_jaqal_program
 import jaqalpaq.core.branch
 
 
@@ -187,7 +189,25 @@ class QsyntaxTester(unittest.TestCase):
         text = f"register r[{n}]; prepare_all; measure_all"
         self.run_test(func, text, n)
 
-    def run_test(self, func, text, *args):
+    def test_variadic_gate(self):
+        gatedefs = {
+            "prepare_all": GateDefinition("prepare_all", []),
+            "measure_all": GateDefinition("measure_all", []),
+            "Foo": GateDefinition(
+                "Foo", [Parameter("a", ParamType.INT, variadic=True)]
+            ),
+        }
+
+        @circuit(inject_pulses=gatedefs)
+        def func(Q):
+            Q.Foo(1, 2, 3, 4)
+
+        text = "prepare_all; Foo 1 2 3 4; measure_all"
+        self.run_test(func, text, inject_pulses=gatedefs)
+
+    def run_test(self, func, text, *args, inject_pulses=None):
         func_circ = func(*args)
-        text_circ = parse_jaqal_string(text, autoload_pulses=False)
+        text_circ = parse_jaqal_string(
+            text, autoload_pulses=False, inject_pulses=inject_pulses
+        )
         self.assertEqual(func_circ, text_circ)

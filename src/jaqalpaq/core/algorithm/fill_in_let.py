@@ -88,7 +88,7 @@ class LetFiller(Visitor):
         sexpr = [
             "gate",
             gate.name,
-            *[self.visit(param) for param in gate.parameters.values()],
+            *[self.visit(param) for param in gate.parameters_linear],
         ]
         return sexpr
 

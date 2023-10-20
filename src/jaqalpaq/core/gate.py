@@ -3,6 +3,7 @@
 # certain rights in this software.
 from itertools import zip_longest
 import math
+import warnings
 
 from jaqalpaq.error import JaqalError
 
@@ -24,7 +25,7 @@ class GateStatement:
 
     def __repr__(self):
         params = ", ".join(
-            [repr(self.name)] + [repr(param) for param in self.parameters.values()]
+            [repr(self.name)] + [repr(param) for param in self._parameters.values()]
         )
         return f"GateStatement({params})"
 
@@ -38,7 +39,7 @@ class GateStatement:
             return self.name == other.name and all(
                 are_equal(sparam, oparam)
                 for sparam, oparam in zip_longest(
-                    self.parameters.values(), other.parameters.values()
+                    self.parameters_linear, other.parameters_linear
                 )
             )
         except AttributeError:
@@ -72,7 +73,43 @@ class GateStatement:
 
     @property
     def parameters(self):
+        """(deprecated) Read-only access to the dictionary mapping
+        gate parameter names to the associated values.
         """
-        Read-only access to the dictionary mapping gate parameter names to the associated values.
+        warnings.warn(
+            "Please use one of the Gate.parameters_* properties", DeprecationWarning
+        )
+        return self._parameters
+
+    @property
+    def parameters_by_name(self):
+        """Return a dictionary mapping parameter names to the
+        associated values. If a parameter is variadic, it will be
+        mapped to a list of its values.
         """
         return self._parameters
+
+    @property
+    def parameters_linear(self):
+        """Return an ordered list of all parameter values. Variadic
+        parameters are listed indistinguishable from others."""
+        res = []
+        for val in self._parameters.values():
+            if not isinstance(val, list):
+                res.append(val)
+            else:
+                res.extend(val)
+        return res
+
+    @property
+    def parameters_with_types(self):
+        """Return a list of 2-tuples of (value, type) for each
+        parameter. Variadic parameters are included like all other
+        parameters."""
+        res = []
+        for val, typ in zip(self._parameters.values(), self._gate_def.parameters):
+            if not typ.variadic:
+                res.append((val, typ))
+            else:
+                res.extend((v, typ) for v in val)
+        return res

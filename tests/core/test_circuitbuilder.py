@@ -210,7 +210,7 @@ class BuildTester(unittest.TestCase):
         self.assertFalse(block.parallel)
         self.assertEqual(block.statements[0].name, "foo")
         self.assertEqual(block.statements[1].name, "bar")
-        self.assertEqual(block.statements[1].parameters["p0"], 123)
+        self.assertEqual(block.statements[1].parameters_by_name["p0"], 123)
 
     def test_build_parallel_block(self):
         sexpr = ("parallel_block", ("gate", "foo"), ("gate", "bar", 123))
@@ -219,7 +219,7 @@ class BuildTester(unittest.TestCase):
         self.assertTrue(block.parallel)
         self.assertEqual(block.statements[0].name, "foo")
         self.assertEqual(block.statements[1].name, "bar")
-        self.assertEqual(block.statements[1].parameters["p0"], 123)
+        self.assertEqual(block.statements[1].parameters_by_name["p0"], 123)
 
     def test_build_subcircuit(self):
         sexpr = ("subcircuit_block", 100, ("gate", "foo"))
@@ -246,7 +246,7 @@ class BuildTester(unittest.TestCase):
         )
         circuit: core.Circuit = build(sexpr)
         exp_value = circuit.registers["r"][0]
-        act_value = circuit.body.statements[0].parameters["p0"]
+        act_value = circuit.body.statements[0].parameters_by_name["p0"]
         self.assertEqual(exp_value, act_value)
 
     def test_build_map_with_let(self):
@@ -352,6 +352,18 @@ class BuildTester(unittest.TestCase):
         parallel_block.statements.append(gate_def(1))
         exp_value.body.statements.append(parallel_block)
 
+        self.assertEqual(exp_value, act_value)
+
+    def test_variadic(self):
+        """Build a circuit with a variadic gate definition"""
+        gatedefs = {
+            "Foo": GateDefinition(
+                "Foo", [Parameter("a", ParamType.INT, variadic=True)]
+            ),
+        }
+        sexpr = ("gate", "Foo", 1, 2, 3, 4)
+        exp_value = gatedefs["Foo"](1, 2, 3, 4)
+        act_value = build(sexpr, inject_pulses=gatedefs)
         self.assertEqual(exp_value, act_value)
 
 

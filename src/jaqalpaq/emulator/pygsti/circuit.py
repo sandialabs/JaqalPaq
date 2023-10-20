@@ -25,7 +25,7 @@ def pygsti_label_from_statement(gate):
         return None
 
     args = [f"GJ{gate.name}"]
-    for param, template in zip(gate.parameters.values(), gate.gate_def.parameters):
+    for param, template in gate.parameters_with_types:
         if template.classical:
             args.append(";")
             if type(param) == Constant:
@@ -180,7 +180,7 @@ class pyGSTiCircuitGeneratingVisitor(UsedQubitIndicesVisitor):
             assert False
             # This should never be called: we should expand macros before using this.
             context = context or {}
-            macro_context = {**context, **obj.parameters}
+            macro_context = {**context, **obj.parameters_by_name}
             macro_body = obj.gate_def.body
             return self.visit(macro_body, macro_context)
         else:
@@ -210,4 +210,4 @@ class pyGSTiCircuitGeneratingVisitor(UsedQubitIndicesVisitor):
                 # default to 0 duration
                 return (label, indices, 0)
 
-            return (label, indices, duration(*obj.parameters.values()))
+            return (label, indices, duration(*obj.parameters_linear))

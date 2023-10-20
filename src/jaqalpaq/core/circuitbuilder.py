@@ -466,7 +466,7 @@ class RebuildMacroInContextVisitor(Visitor):
             if gate_def == gate.gate_def:
                 return False, gate
 
-            args = gate.parameters.values()
+            args = gate.parameters_linear
             new_gate = gate_def(*args)
             return True, new_gate
         else:

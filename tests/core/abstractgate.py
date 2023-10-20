@@ -35,10 +35,10 @@ class AbstractGateTesterBase:
         """Test creating a GateStatement from a GateDefinition with no arguments."""
         gatedef = self.create_random_instance(parameter_count=0)
         gate = gatedef()
-        self.assertEqual({}, gate.parameters)
+        self.assertEqual({}, gate.parameters_by_name)
         self.assertEqual(gatedef.name, gate.name)
         gate = gatedef()
-        self.assertEqual({}, gate.parameters)
+        self.assertEqual({}, gate.parameters_by_name)
         self.assertEqual(gatedef.name, gate.name)
 
     def test_positional_args(self):
@@ -49,10 +49,10 @@ class AbstractGateTesterBase:
         arg_dict = {
             param.name: arg for param, arg in zip(gatedef.parameters, arguments)
         }
-        self.assertEqual(arg_dict, gate.parameters)
+        self.assertEqual(arg_dict, gate.parameters_by_name)
         self.assertEqual(gatedef.name, gate.name)
         gate = gatedef(*arguments)
-        self.assertEqual(arg_dict, gate.parameters)
+        self.assertEqual(arg_dict, gate.parameters_by_name)
         self.assertEqual(gatedef.name, gate.name)
 
     def test_fail_too_many_args(self):
@@ -99,10 +99,10 @@ class AbstractGateTesterBase:
         arguments = common.make_random_argument_list(arg_types)
         kwargs = {param.name: arg for param, arg in zip(gatedef.parameters, arguments)}
         gate = gatedef(**kwargs)
-        self.assertEqual(kwargs, gate.parameters)
+        self.assertEqual(kwargs, gate.parameters_by_name)
         self.assertEqual(gatedef.name, gate.name)
         gate = gatedef(**kwargs)
-        self.assertEqual(kwargs, gate.parameters)
+        self.assertEqual(kwargs, gate.parameters_by_name)
         self.assertEqual(gatedef.name, gate.name)
 
     def test_fail_on_mixing_arg_types(self):

@@ -89,11 +89,11 @@ def replace_gate(gate, macros):
     it is not a macro."""
     if gate.name in macros:
         macro = macros[gate.name]
-        if len(gate.parameters) != len(macro.parameters):
+        if len(gate.parameters_by_name) != len(macro.parameters):
             raise JaqalError(
-                f"Cannot expand {gate.name}: wrong argument count: {len(gate.parameters)} != {len(macro.parameters)}"
+                f"Cannot expand {gate.name}: wrong argument count: {len(gate.parameters_by_name)} != {len(macro.parameters)}"
             )
-        visitor = GateReplacer(gate.parameters, macros)
+        visitor = GateReplacer(gate.parameters_by_name, macros)
         return visitor.visit(macro)
     else:
         return gate
@@ -128,7 +128,7 @@ class GateReplacer(Visitor):
 
     def visit_GateStatement(self, gate: GateStatement):
         new_parameters = {
-            name: self.visit(param) for name, param in gate.parameters.items()
+            name: self.visit(param) for name, param in gate.parameters_by_name.items()
         }
         new_gate = gate.gate_def(**new_parameters)
         return replace_gate(new_gate, self.macros)

@@ -135,10 +135,7 @@ def generate_jaqal_gate(statement, depth):
             " ".join(
                 (
                     statement.name,
-                    *(
-                        generate_jaqal_value(val)
-                        for val in statement.parameters.values()
-                    ),
+                    *(generate_jaqal_value(val) for val in statement.parameters_linear),
                 )
             ),
             "\n",

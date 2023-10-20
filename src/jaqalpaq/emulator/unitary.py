@@ -136,7 +136,7 @@ class UnitarySerializedEmulator(EmulatedIndependentSubcircuitsBackend):
                 if ideal_unitary is None:
                     continue
 
-                for param, val in zip(gatedef.parameters, gate.parameters.values()):
+                for val, param in gate.parameters_with_types:
                     if param.classical:
                         argv.append(val)
                     else:

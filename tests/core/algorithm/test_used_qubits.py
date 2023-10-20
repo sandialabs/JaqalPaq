@@ -93,7 +93,7 @@ class UsedQubitTester(unittest.TestCase):
     def make_exp_qubits_from_gate(self, gate, context=None, exp_qubits=None):
         if exp_qubits is None:
             exp_qubits = defaultdict(set)
-        for name, arg in gate.parameters.items():
+        for arg in gate.parameters_linear:
             if isinstance(arg, core.NamedQubit):
                 reg, index = arg.resolve_qubit()
                 exp_qubits[reg.name].add(index)

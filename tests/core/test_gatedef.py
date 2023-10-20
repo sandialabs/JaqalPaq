@@ -42,10 +42,10 @@ class GateDefinitionTester(AbstractGateTesterBase, unittest.TestCase):
                 last = gatedef.parameters[-1]
                 arg_dict[last.name] = list(arguments[len(gatedef.parameters) - 1 :])
 
-            self.assertEqual(arg_dict, gate.parameters)
+            self.assertEqual(arg_dict, gate.parameters_by_name)
             self.assertEqual(gatedef.name, gate.name)
             gate = gatedef(*arguments)
-            self.assertEqual(arg_dict, gate.parameters)
+            self.assertEqual(arg_dict, gate.parameters_by_name)
             self.assertEqual(gatedef.name, gate.name)
 
     def test_variadic_keyword_arg(self):
@@ -72,10 +72,10 @@ class GateDefinitionTester(AbstractGateTesterBase, unittest.TestCase):
                 not param.variadic for param in gatedef.parameters[:-1]
             ), "Variadic arguments only tested in final position"
 
-            self.assertEqual(arg_dict, gate.parameters)
+            self.assertEqual(arg_dict, gate.parameters_by_name)
             self.assertEqual(gatedef.name, gate.name)
             gate = gatedef(*arguments)
-            self.assertEqual(arg_dict, gate.parameters)
+            self.assertEqual(arg_dict, gate.parameters_by_name)
             self.assertEqual(gatedef.name, gate.name)
 
     def test_reject_nonfinal_variadic(self):

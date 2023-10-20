@@ -242,13 +242,18 @@ def make_random_argument_list(argument_types):
     return arguments
 
 
-def make_random_value(value_type):
+def make_random_value(value_type, variadic=False, count=None):
     """Create a random value of the given type.
 
     Note that registers and qubits will just be their own thing and not
     tied to any existing objects.
 
     Note that in the case of a float, this can return nan and inf."""
+
+    if variadic:
+        count = random_integer() if count is None else count
+        return [make_random_value(value_type) for _ in range(count)]
+
     if value_type == ParamType.NONE:
         value_type = random.choice(
             [ParamType.INT, ParamType.FLOAT, ParamType.REGISTER, ParamType.QUBIT]
@@ -318,14 +323,20 @@ def make_random_block(*, count=None, parallel=False, return_params=False):
 
 
 def make_random_gate_statement(
-    *, count=None, parameter_types=None, return_params=False
+    *, count=None, parameter_types=None, return_params=False, variadic=False
 ):
     """Make a gate statement with random arguments based on
     a GateDefinition."""
     definition, _, parameters = make_random_gate_definition(
-        parameter_count=count, parameter_types=parameter_types, return_params=True
+        parameter_count=count,
+        parameter_types=parameter_types,
+        return_params=True,
+        variadic=variadic,
     )
-    arguments = {param.name: make_random_value(param.kind) for param in parameters}
+    arguments = {
+        param.name: make_random_value(param.kind, variadic=param.variadic)
+        for param in parameters
+    }
     gate = GateStatement(definition, parameters=arguments)
     if not return_params:
         return gate

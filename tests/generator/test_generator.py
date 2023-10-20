@@ -3,6 +3,7 @@ from unittest import TestCase
 
 from jaqalpaq.generator import generate_jaqal_program
 from jaqalpaq.parser import parse_jaqal_string
+from jaqalpaq.core import GateDefinition, Circuit, Parameter, ParamType
 
 
 class GeneratorTester(TestCase):
@@ -112,3 +113,14 @@ class GeneratorTester(TestCase):
 
     def test_let_in_register_qubit(self):
         self.run_test_string("let i 1; register q[2]; Rx q[i] 1")
+
+    def test_variadict_gate(self):
+        circ = Circuit()
+        gatedef = GateDefinition(
+            "Foo", [Parameter("Rest", ParamType.INT, variadic=True)]
+        )
+        gate = gatedef(1, 2, 3, 4)
+        circ._body.statements.append(gate)
+        exp = "Foo 1 2 3 4"
+        act = generate_jaqal_program(circ).strip()
+        self.assertEqual(exp, act)

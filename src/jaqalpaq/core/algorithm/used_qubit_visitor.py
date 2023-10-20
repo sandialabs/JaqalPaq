@@ -65,7 +65,7 @@ class UsedQubitIndicesVisitor(Visitor):
         # Note: This could be more elegant with a is_macro method on gates
         if isinstance(obj.gate_def, Macro):
             context = context or {}
-            macro_context = {**context, **obj.parameters}
+            macro_context = {**context, **obj.parameters_by_name}
             macro_body = obj.gate_def.body
             return self.visit(macro_body, macro_context)
         else:
