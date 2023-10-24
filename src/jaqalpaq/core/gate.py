@@ -69,7 +69,11 @@ class GateStatement:
             if param is all:
                 yield all
                 return
-            yield self._parameters[param.name]
+            val = self._parameters[param.name]
+            if isinstance(val, list):
+                yield from val
+            else:
+                yield val
 
     @property
     def parameters(self):
