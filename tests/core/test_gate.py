@@ -1,6 +1,6 @@
 import unittest
 
-from jaqalpaq.core import GateStatement
+from jaqalpaq.core import GateStatement, GateDefinition, Parameter, ParamType, Register
 
 from .randomize import random_identifier, random_whole
 from . import common
@@ -86,3 +86,27 @@ class GateTester(unittest.TestCase):
             else:
                 typed_args.extend((a, param) for a in arg)
         self.assertEqual(typed_args, gate.parameters_with_types)
+
+    def test_used_qubits(self):
+        params = [
+            Parameter("q", ParamType.QUBIT),
+            Parameter("c", ParamType.FLOAT),
+        ]
+        gatedef = GateDefinition("Foo", params)
+        reg = Register("q", size=1)
+        gate = gatedef(reg[0], 3.14)
+        exp = [reg[0]]
+        act = list(gate.used_qubits)
+        self.assertEqual(exp, act)
+
+    def test_used_qubits_variadic(self):
+        params = [
+            Parameter("c", ParamType.FLOAT),
+            Parameter("q", ParamType.QUBIT, variadic=True),
+        ]
+        gatedef = GateDefinition("Foo", params)
+        reg = Register("q", size=2)
+        gate = gatedef(3.14, reg[0], reg[1])
+        exp = [reg[0], reg[1]]
+        act = list(gate.used_qubits)
+        self.assertEqual(exp, act)
