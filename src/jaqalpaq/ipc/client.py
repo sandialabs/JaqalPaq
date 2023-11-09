@@ -22,9 +22,7 @@ from jaqalpaq.ipc.header import IPCHeader
 def emit_jaqal_for_hardware(circuit, overrides):
     """(internal) Generate Jaqal appropriate for running on the hardware."""
     jaqal = generate_jaqal_program(circuit)
-    if overrides:
-        jaqal = "".join((jaqal, "\n// OVERRIDES: ", json.dumps(overrides), "\n"))
-    return jaqal
+    return "".join((jaqal, "\n// OVERRIDES: ", json.dumps(overrides or {}), "\n"))
 
 
 class IPCBackend(IndependentSubcircuitsBackend):
