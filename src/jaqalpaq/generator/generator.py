@@ -1,6 +1,8 @@
 # Copyright 2020 National Technology & Engineering Solutions of Sandia, LLC (NTESS).
 # Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains
 # certain rights in this software.
+import decimal
+
 from jaqalpaq.core import (
     GateStatement,
     BlockStatement,
@@ -181,6 +183,9 @@ def generate_jaqal_block(statement, depth, indent_first_line):
     return output
 
 
+_jaqal_value_numeric_context = decimal.Context(prec=20)
+
+
 def generate_jaqal_value(val):
     if (
         isinstance(val, Register)
@@ -189,4 +194,4 @@ def generate_jaqal_value(val):
     ):
         return val.name
     elif isinstance(val, float) or isinstance(val, int):
-        return str(val)
+        return format(_jaqal_value_numeric_context.create_decimal(repr(val)), "f")

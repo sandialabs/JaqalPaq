@@ -89,6 +89,11 @@ class GeneratorTester(TestCase):
     def test_single_qubit_gs(self):
         self.run_test("examples/jaqal/single_qubit_gst.jaqal")
 
+    def test_small_rotation(self):
+        self.run_test_string(
+            "register q[1]\nprepare_all\nRx q[0] 0.0000000526\nmeasure_all"
+        )
+
     def test_randomized_rotations(self):
         from random import uniform
         from math import pi
