@@ -83,7 +83,9 @@ class Register:
                 alias_from.size, AnnotatedValue
             ):
                 if alias_slice.stop > alias_from.size:
-                    raise JaqalError("Index out of range.")
+                    raise JaqalError(
+                        f"Slice ({alias_slice.start}:{alias_slice.stop}:{alias_slice.step}) out of range [0, {alias_from.size}) from {alias_from}."
+                    )
 
     def __hash__(self):
         return hash((self.__class__, self._name, self._size))
@@ -207,7 +209,7 @@ class Register:
         context = context or {}
 
         if self.size is not None and idx >= self.size:
-            raise JaqalError("Index out of range.")
+            raise JaqalError(f"Index {idx} out of range [0, {self.size}) in {self}.")
         if self.fundamental:
             return (self, idx)
         alias_from = self.alias_from
@@ -291,7 +293,9 @@ class NamedQubit:
             except JaqalError:
                 return
             if alias_index >= from_size:
-                raise JaqalError("Index out of range.")
+                raise JaqalError(
+                    f"Index {alias_index} out of range [0, {from_size}) in {alias_from}."
+                )
 
     def __hash__(self):
         return hash((self.__class__, self._name, self._alias_from, self._alias_index))
