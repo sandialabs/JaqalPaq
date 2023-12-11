@@ -73,7 +73,7 @@ class JaqalLexer(Lexer):
     ignore_comment = r"//[^\n]*"
     # We have to get fancy since the regular expression . does not
     # match a new line
-    ignore_multiline_comment = r"/\*(\n|[^\n])*\*/"
+    ignore_multiline_comment = r"/\*(\n|[^\n])*?\*/"
 
     def ignore_comment(self, token):
         self.lineno += token.value.count("\n")

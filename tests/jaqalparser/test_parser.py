@@ -20,6 +20,12 @@ class ParserTester(unittest.TestCase):
         sexpr = ["circuit", ["register", "q", 2]]
         self.run_test(text, sexpr)
 
+    def test_multiple_multiline_comments(self):
+        """Test parsing a multi-line comment"""
+        text = "/*first comment*/let x 0\n/*register q[3]\nMore text\nlet a 2\n*/register q[2]"
+        sexpr = ["circuit", ["let", "x", 0], ["register", "q", 2]]
+        self.run_test(text, sexpr)
+
     def test_reg(self):
         """Test parsing the register statement"""
         text = "register q[3]"
