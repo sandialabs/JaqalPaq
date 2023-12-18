@@ -8,15 +8,6 @@ import functools
 from typing import Any
 from inspect import getfullargspec
 
-try:
-    from contextlib import _GeneratorContextManager
-except ImportError as exc:
-    import sys
-
-    raise ImportError(
-        f"JaqalPaq: You are using Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}, which does not have the internal _GeneratorContextManager required by this module"
-    ) from exc
-
 from jaqalpaq.error import JaqalError
 from jaqalpaq.core.circuitbuilder import build
 
@@ -872,8 +863,9 @@ class DecoratorOrContext:
 
     def __enter__(self):
         # Remove references to what is passed to the context manager.
-        self._cm = _GeneratorContextManager(
-            self.ctx_func, self._pop_args(), self._pop_kwargs()
+        self._cm = contextmanager(self.ctx_func)(
+            *self._pop_args(),
+            **self._pop_kwargs(),
         )
         self.ctx_func = None
         return self._cm.__enter__()
