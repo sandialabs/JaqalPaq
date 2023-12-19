@@ -28,8 +28,7 @@ class CircuitInterface:
         return DecoratorOrContext(self._sequential_decorator, self._sequential_context)
 
     def _sequential_decorator(self, func):
-        _add_block(self._blocks, func, "sequential")
-        return func
+        return _register_block_function(self._blocks, func, "sequential")
 
     def _sequential_context(self):
         raise JaqalError(f"Use the Q object to open a sequential context")
@@ -41,8 +40,7 @@ class CircuitInterface:
         return DecoratorOrContext(self._parallel_decorator, self._parallel_context)
 
     def _parallel_decorator(self, func):
-        _add_block(self._blocks, func, "parallel")
-        return func
+        return _register_block_function(self._blocks, func, "parallel")
 
     def _parallel_context(self):
         raise JaqalError(f"Use the Q object to open a parallel context")
@@ -54,8 +52,7 @@ class CircuitInterface:
         return DecoratorOrContext(self._subcircuit_decorator, self._subcircuit_context)
 
     def _subcircuit_decorator(self, func, argument=1):
-        _add_block(self._blocks, func, "subcircuit", argument)
-        return func
+        return _register_block_function(self._blocks, func, "subcircuit", argument)
 
     def _subcircuit_context(self, *args):
         raise JaqalError(f"Use the Q object to open a subcircuit context")
@@ -67,8 +64,7 @@ class CircuitInterface:
         return DecoratorOrContext(self._loop_decorator, self._loop_context)
 
     def _loop_decorator(self, func, repeats):
-        _add_block(self._blocks, func, "loop", repeats)
-        return func
+        return _register_block_function(self._blocks, func, "loop", repeats)
 
     def _loop_context(self, *args):
         raise JaqalError(f"Use the Q object to open a loop context")
@@ -153,13 +149,18 @@ class Q:
     def _make_block(self, func, context_name, *ctxargs):
         """Create a block from a function that was stored earlier."""
 
-        context = getattr(self, context_name)
-
+        @functools.wraps(func)
         def do_block(*funcargs):
-            with context(*ctxargs):
+            with self._block_context(context_name, ctxargs):
                 func(self, *funcargs)
 
         return do_block
+
+    @contextmanager
+    def _block_context(self, context_name, args):
+        context = getattr(self, context_name)
+        with context(*args):
+            yield
 
     def register(self, size, name=None):
         """Create a register with the given size.
@@ -193,8 +194,7 @@ class Q:
         return DecoratorOrContext(self._loop_decorator, self._loop_context)
 
     def _loop_decorator(self, func, repeats):
-        _add_block(self._blocks, func, "loop", repeats)
-        return func
+        return _register_block_function(self._blocks, func, "loop", repeats)
 
     def _loop_context(self, repeats):
         with self._stack.frame():
@@ -209,8 +209,7 @@ class Q:
         return DecoratorOrContext(self._sequential_decorator, self._sequential_context)
 
     def _sequential_decorator(self, func):
-        _add_block(self._blocks, func, "sequential")
-        return func
+        return _register_block_function(self._blocks, func, "sequential")
 
     def _sequential_context(self):
         with self._stack.frame():
@@ -225,8 +224,7 @@ class Q:
         return DecoratorOrContext(self._parallel_decorator, self._parallel_context)
 
     def _parallel_decorator(self, func):
-        _add_block(self._blocks, func, "parallel")
-        return func
+        return _register_block_function(self._blocks, func, "parallel")
 
     def _parallel_context(self):
         with self._stack.frame():
@@ -241,8 +239,7 @@ class Q:
         return DecoratorOrContext(self._subcircuit_decorator, self._subcircuit_context)
 
     def _subcircuit_decorator(self, func, argument=1):
-        _add_block(self._blocks, func, "subcircuit", argument)
-        return func
+        return _register_block_function(self._blocks, func, "subcircuit", argument)
 
     def _subcircuit_context(self, argument=1):
         with self._stack.frame():
@@ -766,6 +763,26 @@ def is_qcircuit(func, argcount=None):
     return True
 
 
+def _register_block_function(blocks, func, *args):
+    """Register a block function to a dictionary of stored blocks, and
+    return a function that can be called with a Q instance as its
+    first argument to create that block in a circuit."""
+
+    func_name = _add_block(blocks, func, *args)
+    context_name, *ctxargs = args
+
+    @functools.wraps(func)
+    def do_block(Qinst, *funcargs):
+        if not isinstance(Qinst, Q):
+            raise JaqalError(
+                f"call {func} either as Q.{func_name}(...) or {func_name}(Q,...)"
+            )
+        with Qinst._block_context(context_name, ctxargs):
+            func(Qinst, *funcargs)
+
+    return do_block
+
+
 def _add_block(blocks, func, source, *args):
     """Add a function block to a dictionary of stored blocks."""
     if not callable(func):
@@ -775,13 +792,17 @@ def _add_block(blocks, func, source, *args):
     try:
         func_name = func.__name__
     except AttributeError:
-        raise JaqalError(f"Could not determine name of function used with {source}()")
+        raise JaqalError(
+            f"Could not determine name of function used with {source}(), if this is a class instance, add a '__name__' member."
+        )
     # We could test to make sure the user isn't redefining a block, as
     # this is usually an error. However, Python silently allows this
     # behavior in general. Also, there are times when it is desirable,
     # such as locally overriding a block, or iterating on a circuit in
     # a Jupyter notebook without reloading the kernel.
     blocks[func_name] = (func, source, *args)
+
+    return func_name
 
 
 class DecoratorOrContext:

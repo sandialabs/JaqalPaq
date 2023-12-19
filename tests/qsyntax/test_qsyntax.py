@@ -4,6 +4,7 @@ from jaqalpaq.qsyntax import circuit
 from jaqalpaq.parser import parse_jaqal_string
 from jaqalpaq.core import GateDefinition, Parameter, ParamType
 from jaqalpaq.generator import generate_jaqal_program
+from jaqalpaq.error import JaqalError
 import jaqalpaq.core.branch
 
 
@@ -240,6 +241,98 @@ class QsyntaxTester(unittest.TestCase):
         text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
         self.run_test(func, text)
 
+    def test_sequential_function_standalone(self):
+        """Test using a function with a Q.sequential decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.sequential
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            make_body(Q, r)
+
+        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_sequential_function_inst(self):
+        """Test using a function with a Q.sequential decorator."""
+
+        class Body:
+            def __init__(self, name, idx):
+                self.__name__ = name
+                self.idx = idx
+
+            def __call__(self, Q, r):
+                Q.Foo(r[self.idx])
+
+        @circuit
+        def func(Q):
+            Q.sequential(Body("make_body", 0))
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_global_sequential_function_inst(self):
+        """Test using a function with a Q.sequential decorator."""
+
+        class Body:
+            def __init__(self, name, idx):
+                self.__name__ = name
+                self.idx = idx
+
+            def __call__(self, Q, r):
+                Q.Foo(r[self.idx])
+
+        circuit.sequential(Body("make_body", 0))
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_sequential_function_inst_noname(self):
+        """Test using a function with a Q.sequential decorator."""
+
+        class Body:
+            def __init__(self, idx):
+                self.idx = idx
+
+            def __call__(self, Q, r):
+                Q.Foo(r[self.idx])
+
+        @circuit
+        def func(Q):
+            Q.sequential(Body(0))
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        with self.assertRaises(JaqalError):
+            func()
+
+    def test_sequential_function_standalone_no_q(self):
+        """Test using a function with a Q.sequential decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.sequential
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            make_body(r)
+
+        with self.assertRaises(JaqalError):
+            func()
+
     def test_global_sequential_function(self):
         """Test a function outside a circuit with a circuit.sequential decorator."""
 
@@ -251,6 +344,21 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             r = Q.register(2, "r")
             Q.make_body(r)
+
+        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_global_sequential_function_standalone(self):
+        """Test a function outside a circuit with a circuit.sequential decorator."""
+
+        @circuit.sequential()
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            make_body(Q, r)
 
         text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
         self.run_test(func, text)
@@ -285,6 +393,21 @@ class QsyntaxTester(unittest.TestCase):
         text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
         self.run_test(func, text)
 
+    def test_parallel_function_standalone(self):
+        """Test using a function with a Q.parallel decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.parallel
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            make_body(Q, r)
+
+        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        self.run_test(func, text)
+
     def test_global_parallel_function(self):
         """Test a function outside a circuit with a circuit.parallel decorator."""
 
@@ -296,6 +419,21 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             r = Q.register(2, "r")
             Q.make_body(r)
+
+        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        self.run_test(func, text)
+
+    def test_global_parallel_function_standalone(self):
+        """Test a function outside a circuit with a circuit.parallel decorator."""
+
+        @circuit.parallel()
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            make_body(Q, r)
 
         text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
         self.run_test(func, text)
@@ -330,6 +468,21 @@ class QsyntaxTester(unittest.TestCase):
         text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
+    def test_subcircuit_function_standalone(self):
+        """Test using a function with a Q.subcircuit decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.subcircuit
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            make_body(Q, r)
+
+        text = "register r[2]; subcircuit {Foo r[0]}"
+        self.run_test(func, text)
+
     def test_subcircuit_function_with_arg(self):
         """Test using a function with a Q.subcircuit decorator."""
 
@@ -341,6 +494,21 @@ class QsyntaxTester(unittest.TestCase):
 
             r = Q.register(2, "r")
             Q.make_body(r)
+
+        text = "register r[2]; subcircuit 42 {Foo r[0]}"
+        self.run_test(func, text)
+
+    def test_subcircuit_function_with_arg_standalone(self):
+        """Test using a function with a Q.subcircuit decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.subcircuit(42)
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            make_body(Q, r)
 
         text = "register r[2]; subcircuit 42 {Foo r[0]}"
         self.run_test(func, text)
@@ -390,6 +558,21 @@ class QsyntaxTester(unittest.TestCase):
         text = "register r[2]; subcircuit 42 {Foo r[0]}"
         self.run_test(func, text)
 
+    def test_global_subcircuit_function_with_arg_standalone(self):
+        """Test a function outside a circuit with a circuit.subcircuit decorator."""
+
+        @circuit.subcircuit(42)
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            make_body(Q, r)
+
+        text = "register r[2]; subcircuit 42 {Foo r[0]}"
+        self.run_test(func, text)
+
     def test_loop_function(self):
         """Test using a function with a Q.loop decorator."""
 
@@ -405,6 +588,21 @@ class QsyntaxTester(unittest.TestCase):
         text = "register r[2]; prepare_all; loop 5 {Foo r[0]}; measure_all"
         self.run_test(func, text)
 
+    def test_loop_function_standalone(self):
+        """Test using a function with a Q.loop decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.loop(5)
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            make_body(Q, r)
+
+        text = "register r[2]; prepare_all; loop 5 {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
     def test_global_loop_function(self):
         """Test a function outside a circuit with a circuit.loop decorator."""
 
@@ -416,6 +614,21 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             r = Q.register(2, "r")
             Q.make_body(r)
+
+        text = "register r[2]; prepare_all; loop 10 {Foo r[0]}; measure_all"
+        self.run_test(func, text)
+
+    def test_global_loop_function_standalone(self):
+        """Test a function outside a circuit with a circuit.loop decorator."""
+
+        @circuit.loop(10)
+        def make_body(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            make_body(Q, r)
 
         text = "register r[2]; prepare_all; loop 10 {Foo r[0]}; measure_all"
         self.run_test(func, text)
