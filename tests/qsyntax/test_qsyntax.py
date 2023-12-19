@@ -241,6 +241,30 @@ class QsyntaxTester(unittest.TestCase):
         text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
         self.run_test(func, text)
 
+    def test_sequential_function_redefine_gate(self):
+        """Test a sequential function attempting to redefine a gate."""
+
+        native_gates = {
+            "prepare_all": GateDefinition("prepare_all"),
+            "measure_all": GateDefinition("measure_all"),
+            "Foo": GateDefinition(
+                "Foo", parameters=[Parameter("r", ParamType.REGISTER)]
+            ),
+            "Sx": GateDefinition("Sx", parameters=[Parameter("q", ParamType.QUBIT)]),
+        }
+
+        @circuit(inject_pulses=native_gates)
+        def func(Q):
+            @Q.sequential
+            def Foo(Q, r):
+                Q.Sx(r[0])
+
+            r = Q.register(2, "r")
+            Q.Foo(r)
+
+        with self.assertRaises(JaqalError):
+            func()
+
     def test_sequential_function_standalone(self):
         """Test using a function with a Q.sequential decorator."""
 

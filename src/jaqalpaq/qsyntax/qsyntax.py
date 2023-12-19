@@ -437,7 +437,12 @@ def circuit_from_stack(
         # ensure we've filtered out any special values by now.
         raise JaqalError(f"Bad value for autoload_pulses: {autoload_pulses}")
 
-    return build(sexpr, inject_pulses=inject_pulses, autoload_pulses=autoload_pulses)
+    circ = build(sexpr, inject_pulses=inject_pulses, autoload_pulses=autoload_pulses)
+    if circ.native_gates:
+        for block_name in qsyntax._blocks:
+            if block_name in circ.native_gates:
+                raise JaqalError(f"Attempting to redefine gate {block_name}")
+    return circ
 
 
 class QGate:
