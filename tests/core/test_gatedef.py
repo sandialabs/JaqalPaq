@@ -78,15 +78,41 @@ class GateDefinitionTester(AbstractGateTesterBase, unittest.TestCase):
             self.assertEqual(arg_dict, gate.parameters_by_name)
             self.assertEqual(gatedef.name, gate.name)
 
-    def test_reject_nonfinal_variadic(self):
-        """Test that we properly reject variadic parameters in nonfinal position."""
-        params0 = common.make_random_parameter_list(
-            count=common.random_integer(lower=1, upper=16), variadic=True
-        )
+    def test_reject_multiple_variadic(self):
+        """Test that we properly reject multiple variadic parameters."""
+        params0 = common.make_random_parameter_list(count=1, variadic=True)
         params1 = common.make_random_parameter_list(
             count=common.random_integer(lower=1, upper=16),
             variadic=bool(common.random_integer(lower=0, upper=1)),
         )
-        params = params0 + params1
+        params2 = common.make_random_parameter_list(count=1, variadic=True)
+        params = params0 + params1 + params2
         with self.assertRaises(JaqalError):
             GateDefinition(common.random_identifier(), parameters=params)
+
+    def test_nonfinal_variadic(self):
+        """Test that we properly handle a nonfinal variadic parameter."""
+        params0 = common.make_random_parameter_list(
+            count=common.random_integer(lower=1, upper=4),
+        )
+        params1 = common.make_random_parameter_list(count=1, variadic=True)
+        params2 = common.make_random_parameter_list(
+            count=common.random_integer(lower=1, upper=4),
+        )
+        params = params0 + params1 + params2
+        gatedef = GateDefinition(common.random_identifier(), parameters=params)
+
+        arg_types = [(param.kind, param.variadic) for param in params]
+        arguments = common.make_random_argument_list(arg_types)
+
+        arg_dict = {}
+        for param, arg in zip(params0, arguments):
+            arg_dict[param.name] = arg
+        variadic = arguments[len(params0) : len(arguments) - len(params2)]
+        arg_dict[params1[0].name] = variadic
+        for param, arg in zip(params2, arguments[len(params0) + len(variadic) :]):
+            arg_dict[param.name] = arg
+
+        gate = gatedef(*arguments)
+        self.assertEqual(arg_dict, gate.parameters_by_name)
+        self.assertEqual(gatedef.name, gate.name)

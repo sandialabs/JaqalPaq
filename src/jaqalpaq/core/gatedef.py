@@ -31,10 +31,12 @@ class AbstractGate:
         else:
             self._parameters = parameters
 
-        if any(param.variadic for param in self._parameters[:-1]):
-            # This restriction may be relaxed if necessary but will
-            # require more extensive code changes
-            raise JaqalError(f"Only final parameters may be variadic")
+        variadic = False
+        for param in self._parameters:
+            if param.variadic:
+                if variadic:
+                    raise JaqalError(f"Only one parameter may be variadic")
+                variadic = True
 
         if ideal_unitary is not None:
             warnings.warn("Define unitary in <path>.jaqal_action", DeprecationWarning)
@@ -111,27 +113,30 @@ class AbstractGate:
         :param args: The list of arguments provided to this gate.
         """
         params = OrderedDict()
-        unary_params = [param for param in self.parameters if not param.variadic]
-        variadic_params = [param for param in self.parameters if param.variadic]
+        variadics = 0
+        in_params = self.parameters
 
-        # These should have already been checked in the constructor.
-        assert len(variadic_params) <= 1, "Only one variadic parameter supported"
-        assert not variadic_params or variadic_params[0] == self.parameters[-1]
+        param_i = 0
+        arg_i = 0
+        while param_i < len(in_params):
+            in_param = in_params[param_i]
+            name = in_param.name
+            if in_param.variadic:
+                if variadics:
+                    raise JaqalError("Only one parameter may be variadic")
+                params[name] = variadic_params = []
+                while (len(args) - arg_i) >= (len(in_params) - param_i):
+                    variadic_params.append(args[arg_i])
+                    arg_i += 1
+                variadics += 1
+            else:
+                params[name] = args[arg_i]
+                arg_i += 1
 
-        if len(args) < len(unary_params):
-            raise JaqalError(f"Insufficient parameters for gate {self.name}.")
-        elif not variadic_params and len(args) > len(unary_params):
-            raise JaqalError(f"Too many parameters for gate {self.name}.")
+            param_i += 1
 
-        unary_param_names = [param.name for param in unary_params]
-        unary_args = args[: len(unary_params)]
-        for name, arg in zip(unary_param_names, unary_args):
-            params[name] = arg
-
-        if variadic_params:
-            rest_args = list(args[len(unary_params) :])
-            assert len(unary_params) + len(rest_args) == len(args)
-            params[variadic_params[0].name] = rest_args
+        if arg_i < len(args):
+            raise JaqalError(f"Too many parameters for gate {self.name}")
 
         return params
 
