@@ -69,8 +69,10 @@ def make_random_parameter_list(
             allowed_types = [parameter_types.pop(0)]
         while True:
             param = make_random_parameter(
-                allowed_types=allowed_types, variadic=variadic and i == count - 1
+                allowed_types=allowed_types, variadic=variadic
             )
+            if param.variadic:
+                variadic = False
             if param.name not in names_used:
                 names_used.add(param.name)
                 break
