@@ -339,7 +339,7 @@ class Readout:
     @property
     def as_str(self):
         """The measured result encoded as a string of qubit values."""
-        return f"{self._result:b}".zfill(self._node.bits)[::-1]
+        return self._node.format_index(self._result)
 
     def _repr_pretty_(self, printer, cycle=False):
         printer.text(f"<Readout {self.as_str} index {self._index} from ")
@@ -397,6 +397,9 @@ class ReadoutTreeNode:
             return all_qubits
         else:
             raise NotImplementedError(f"Unsupported measurement {gd.name}")
+
+    def format_index(self, index):
+        return f"{index:b}".zfill(self.bits)[::-1]
 
     @staticmethod
     def deref(tree, index):
@@ -483,7 +486,7 @@ class AbstractTreeAccessor(Accessor):
     @Accessor.direct
     @property
     def by_str(self):
-        return {f"{k:b}".zfill(self.target.bits)[::-1]: v for k, v in self.items()}
+        return {self.target.format_index(k): v for k, v in self.items()}
 
     @Accessor.direct
     @property
@@ -500,7 +503,7 @@ class AbstractTreeAccessor(Accessor):
         bits = self.target.bits
         ret = {}
         for k in range(1 << bits):
-            ret[f"{k:b}".zfill(self.target.bits)[::-1]] = self[k]
+            ret[self.target.format_index(k)] = self[k]
         return ret
 
     @Accessor.direct
@@ -538,7 +541,7 @@ class AbstractTreeAccessor(Accessor):
                 first = False
             else:
                 ret.append(", ")
-            ret.append(f"{k:b}".zfill(self.target.bits)[::-1])
+            ret.append(self.target.format_index(k))
             ret.append(f": {v}")
         ret.append("}")
         return "".join(ret)
