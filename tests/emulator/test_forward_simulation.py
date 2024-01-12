@@ -92,18 +92,31 @@ measure_all
                 "\n".join(("from qscout.v1.std usepulses *", self.jaqal_string))
             )
 
+            ref_dict = {
+                "000": 0.5,
+                "001": 0,
+                "010": 0,
+                "011": 0,
+                "100": 0,
+                "101": 0,
+                "110": 0.5,
+                "111": 0,
+            }
+
             for c_dict in (
                 res.subcircuits[0].probability_by_str,
                 res.subcircuits[0].simulated_probability_by_str,
+                res.subcircuits[0].simulated_probability_by_str,
             ):
-                self.assertAlmostEqual(c_dict["000"], 0.5)
-                self.assertAlmostEqual(c_dict["001"], 0)
-                self.assertAlmostEqual(c_dict["010"], 0)
-                self.assertAlmostEqual(c_dict["011"], 0)
-                self.assertAlmostEqual(c_dict["100"], 0)
-                self.assertAlmostEqual(c_dict["101"], 0)
-                self.assertAlmostEqual(c_dict["110"], 0.5)
-                self.assertAlmostEqual(c_dict["111"], 0)
+                for k, v in ref_dict.items():
+                    self.assertAlmostEqual(c_dict[k], v)
+            for k, v in ref_dict.items():
+                if v == 0:
+                    continue
+                self.assertAlmostEqual(
+                    res.subcircuits[0].simulated_probabilities.by_str[k][0],
+                    v,
+                )
 
     def test_emulate_subcircuit(self):
         jaqal_string = """let pi2 1.5707963267948966
@@ -185,6 +198,9 @@ subcircuit 10 {
 
         self.assertEqual(res.by_time[0].num_repeats, 10)
         self.assertEqual(res.by_subbatch[0].by_subcircuit[0].num_repeats, [10])
+        self.assertEqual(
+            "Tree{000: 0.3, 110: 0.7}", repr(res.by_time[0].normalized_counts)
+        )
 
     def test_five_qubit_GHZ(self):
         jaqal_text = """
