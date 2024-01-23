@@ -6,6 +6,7 @@ class IPCHeader:
     """Represent information in the IPC protocol's header."""
 
     version: int = 0
+    version_byte = 0x80 | version
 
     _encoding_str = "!BI"
     _encoding_size = struct.calcsize(_encoding_str)
@@ -36,12 +37,6 @@ class IPCHeader:
 
     def __init__(self, size):
         self.size = size
-
-    @classmethod
-    @property
-    def version_byte(cls):
-        """Return the version byte as an integer."""
-        return 0x80 | cls.version
 
     def send(self, sock):
         """Write this header to a socket."""
