@@ -41,7 +41,7 @@ class IPCHeader:
     @property
     def version_byte(cls):
         """Return the version byte as an integer."""
-        return 0x8 | cls.version
+        return 0x80 | cls.version
 
     def send(self, sock):
         """Write this header to a socket."""
