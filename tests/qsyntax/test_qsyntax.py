@@ -28,7 +28,7 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             pass
 
-        text = "prepare_all; measure_all"
+        text = "subcircuit { }"
         self.run_test(func, text)
 
     def test_let_constant(self):
@@ -37,7 +37,7 @@ class QsyntaxTester(unittest.TestCase):
             Q.let(5)
             Q.let(10, "mylet")
 
-        text = "let __c0 5; let mylet 10; prepare_all; measure_all"
+        text = "let __c0 5; let mylet 10; subcircuit { }"
         self.run_test(func, text)
 
     def test_deconflict_let_names(self):
@@ -46,7 +46,7 @@ class QsyntaxTester(unittest.TestCase):
             Q.let(0, "__c0")
             Q.let(1)
 
-        text = "let __c0 0; let __c1 1; prepare_all; measure_all"
+        text = "let __c0 0; let __c1 1; subcircuit { }"
         self.run_test(func, text)
 
     def test_unnamed_register(self):
@@ -54,7 +54,7 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             Q.register(2)
 
-        text = "register __r0[2]; prepare_all; measure_all"
+        text = "register __r0[2]; subcircuit { }"
         self.run_test(func, text)
 
     def test_named_register(self):
@@ -62,7 +62,7 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             Q.register(2, "r")
 
-        text = "register r[2]; prepare_all; measure_all"
+        text = "register r[2]; subcircuit { }"
         self.run_test(func, text)
 
     def test_register_constant_size(self):
@@ -71,7 +71,7 @@ class QsyntaxTester(unittest.TestCase):
             n = Q.let(2, "n")
             Q.register(n, "r")
 
-        text = "let n 2; register r[n]; prepare_all; measure_all"
+        text = "let n 2; register r[n]; subcircuit { }"
         self.run_test(func, text)
 
     def test_gate(self):
@@ -79,7 +79,7 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             Q.Foo(1, 3.14)
 
-        text = "prepare_all; Foo 1 3.14; measure_all"
+        text = "subcircuit { Foo 1 3.14 }"
         self.run_test(func, text)
 
     def test_index_qubit(self):
@@ -89,7 +89,7 @@ class QsyntaxTester(unittest.TestCase):
             c = Q.let(1, "c")
             Q.Foo(r[0], r[c])
 
-        text = "register r[2]; let c 1; prepare_all; Foo r[0] r[c]; measure_all"
+        text = "register r[2]; let c 1; subcircuit { Foo r[0] r[c] }"
         self.run_test(func, text)
 
     def test_usepulses(self):
@@ -97,7 +97,7 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             Q.usepulses("sample.v1")
 
-        text = "from sample.v1 usepulses *; prepare_all; measure_all"
+        text = "from sample.v1 usepulses *; subcircuit { }"
         self.run_test(func, text)
 
     def test_sequential_block(self):
@@ -106,7 +106,7 @@ class QsyntaxTester(unittest.TestCase):
             with Q.sequential():
                 Q.Foo(1, 2, 3)
 
-        text = "prepare_all; {Foo 1 2 3}; measure_all"
+        text = "subcircuit {Foo 1 2 3}"
         self.run_test(func, text)
 
     def test_sequential_block_noparen(self):
@@ -115,7 +115,7 @@ class QsyntaxTester(unittest.TestCase):
             with Q.sequential:
                 Q.Foo(1, 2, 3)
 
-        text = "prepare_all; {Foo 1 2 3}; measure_all"
+        text = "subcircuit {Foo 1 2 3}"
         self.run_test(func, text)
 
     def test_parallel_block(self):
@@ -125,7 +125,7 @@ class QsyntaxTester(unittest.TestCase):
                 Q.Foo(1, 2, 3)
                 Q.Bar(1, 2, 3)
 
-        text = "prepare_all; <Foo 1 2 3|Bar 1 2 3>; measure_all"
+        text = "subcircuit { <Foo 1 2 3|Bar 1 2 3> }"
         self.run_test(func, text)
 
     def test_parallel_block_noparen(self):
@@ -135,7 +135,7 @@ class QsyntaxTester(unittest.TestCase):
                 Q.Foo(1, 2, 3)
                 Q.Bar(1, 2, 3)
 
-        text = "prepare_all; <Foo 1 2 3|Bar 1 2 3>; measure_all"
+        text = "subcircuit { <Foo 1 2 3|Bar 1 2 3> }"
         self.run_test(func, text)
 
     def test_subcircuit_block(self):
@@ -164,7 +164,7 @@ class QsyntaxTester(unittest.TestCase):
             with Q.loop(150):
                 Q.Foo(1, 2, 3)
 
-        text = "prepare_all; loop 150 { Foo 1 2 3 }; measure_all"
+        text = "subcircuit { loop 150 { Foo 1 2 3 } }"
         self.run_test(func, text)
 
     def test_loop_constant_arg(self):
@@ -174,7 +174,7 @@ class QsyntaxTester(unittest.TestCase):
             with Q.loop(n):
                 Q.Foo(1, 2, 3)
 
-        text = "let n 150; prepare_all; loop n { Foo 1 2 3 }; measure_all"
+        text = "let n 150; subcircuit { loop n { Foo 1 2 3 } }"
         self.run_test(func, text)
 
     def test_branch_case(self):
@@ -186,7 +186,7 @@ class QsyntaxTester(unittest.TestCase):
                 with Q.case(0b1):
                     Q.Foo(2)
 
-        text = "prepare_all; branch { '0' : { Foo 1}; '1' : {Foo 2}}; measure_all"
+        text = "subcircuit { branch { '0' : { Foo 1}; '1' : {Foo 2}} }"
         self.run_test(func, text)
 
     def test_function_call(self):
@@ -198,7 +198,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             make_body(Q, r)
 
-        text = "register r[2]; prepare_all; Foo r[0]; measure_all"
+        text = "register r[2]; subcircuit { Foo r[0] }"
         self.run_test(func, text)
 
     def test_arguments_to_function(self):
@@ -208,7 +208,7 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q, n):
             r = Q.register(n, "r")
 
-        text = f"register r[{n}]; prepare_all; measure_all"
+        text = f"register r[{n}]; subcircuit {{ }}"
         self.run_test(func, text, n)
 
     def test_variadic_gate(self):
@@ -224,7 +224,7 @@ class QsyntaxTester(unittest.TestCase):
         def func(Q):
             Q.Foo(1, 2, 3, 4)
 
-        text = "prepare_all; Foo 1 2 3 4; measure_all"
+        text = "subcircuit { Foo 1 2 3 4 }"
         self.run_test(func, text, inject_pulses=gatedefs)
 
     def test_sequential_function(self):
@@ -239,7 +239,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
     def test_sequential_function_redefine_gate(self):
@@ -278,7 +278,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             make_body(Q, r)
 
-        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
     def test_sequential_function_inst(self):
@@ -299,7 +299,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
     def test_global_sequential_function_inst(self):
@@ -320,7 +320,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
     def test_sequential_function_inst_noname(self):
@@ -370,7 +370,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
     def test_global_sequential_function_standalone(self):
@@ -385,7 +385,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             make_body(Q, r)
 
-        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
     def test_global_sequential_function_noparen(self):
@@ -400,7 +400,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
 
     def test_parallel_function(self):
@@ -415,7 +415,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        text = "register r[2]; subcircuit { <Foo r[0]> }"
         self.run_test(func, text)
 
     def test_parallel_function_standalone(self):
@@ -430,7 +430,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             make_body(Q, r)
 
-        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        text = "register r[2]; subcircuit { <Foo r[0]> }"
         self.run_test(func, text)
 
     def test_global_parallel_function(self):
@@ -445,7 +445,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        text = "register r[2]; subcircuit { <Foo r[0]> }"
         self.run_test(func, text)
 
     def test_global_parallel_function_standalone(self):
@@ -460,7 +460,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             make_body(Q, r)
 
-        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        text = "register r[2]; subcircuit { <Foo r[0]> }"
         self.run_test(func, text)
 
     def test_global_parallel_function_noparen(self):
@@ -475,7 +475,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; <Foo r[0]>; measure_all"
+        text = "register r[2]; subcircuit { <Foo r[0]> }"
         self.run_test(func, text)
 
     def test_subcircuit_function(self):
@@ -492,6 +492,22 @@ class QsyntaxTester(unittest.TestCase):
 
         text = "register r[2]; subcircuit {Foo r[0]}"
         self.run_test(func, text)
+
+    def test_subcircuit_function_nesting_error(self):
+        """Test using a function with a Q.subcircuit decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.subcircuit
+            def make_body(Q, r):
+                Q.Foo(r[0])
+
+            r = Q.register(2, "r")
+            Q.Foo(r[0])
+            Q.make_body(r)
+
+        with self.assertRaises(JaqalError):
+            func()
 
     def test_subcircuit_function_standalone(self):
         """Test using a function with a Q.subcircuit decorator."""
@@ -610,7 +626,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; loop 5 {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit { loop 5 {Foo r[0]} }"
         self.run_test(func, text)
 
     def test_loop_function_standalone(self):
@@ -625,7 +641,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             make_body(Q, r)
 
-        text = "register r[2]; prepare_all; loop 5 {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit { loop 5 {Foo r[0]} }"
         self.run_test(func, text)
 
     def test_global_loop_function(self):
@@ -640,7 +656,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             Q.make_body(r)
 
-        text = "register r[2]; prepare_all; loop 10 {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit { loop 10 {Foo r[0]} }"
         self.run_test(func, text)
 
     def test_global_loop_function_standalone(self):
@@ -655,7 +671,7 @@ class QsyntaxTester(unittest.TestCase):
             r = Q.register(2, "r")
             make_body(Q, r)
 
-        text = "register r[2]; prepare_all; loop 10 {Foo r[0]}; measure_all"
+        text = "register r[2]; subcircuit { loop 10 {Foo r[0]} }"
         self.run_test(func, text)
 
     def test_no_nested_global_block_decorator(self):

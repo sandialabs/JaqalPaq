@@ -466,14 +466,24 @@ def circuit_from_stack(
     )
 
     if do_implicit_measure:
-        sexpr.append(prepare_gate.build(lookup_object))
+        body = ["subcircuit_block", None]
+    else:
+        body = sexpr
 
     # Process all statements and fill in their arguments
     for stmt in statements:
-        sexpr.append(stmt.build(lookup_object))
+        if do_implicit_measure and isinstance(stmt, QSequentialBlock):
+            for sub_stmt in stmt.statements:
+                body.append(sub_stmt.build(lookup_object))
+        elif do_implicit_measure and isinstance(stmt, QSubcircuitBlock):
+            raise JaqalError(
+                f"Nesting explicit subcircuit block in implicit subcircuit block."
+            )
+        else:
+            body.append(stmt.build(lookup_object))
 
     if do_implicit_measure:
-        sexpr.append(measure_gate.build(lookup_object))
+        sexpr.append(body)
 
     # If the user has not given us gates and has provided at least
     # one usepulses statement, and we can import that module, do
