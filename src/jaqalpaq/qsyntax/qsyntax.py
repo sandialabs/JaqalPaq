@@ -15,6 +15,8 @@ from jaqalpaq.core.circuitbuilder import build
 class CircuitInterface:
     def __init__(self):
         self._blocks = {}
+        # True when we are actively instantiating a circuit
+        self._in_circuit_instantiation = False
 
     def clear(self):
         """Remove any stored function blocks. Mostly useful for unit testing,
@@ -25,6 +27,7 @@ class CircuitInterface:
     def sequential(self):
         """Decorator that registers a function as a sequential block that can
         be inserted later."""
+        self._verify_outside_circuit("sequential")
         return DecoratorOrContext(self._sequential_decorator, self._sequential_context)
 
     def _sequential_decorator(self, func):
@@ -37,6 +40,7 @@ class CircuitInterface:
     def parallel(self):
         """Decorator that registers a function as a parallel block that can
         be inserted later."""
+        self._verify_outside_circuit("parallel")
         return DecoratorOrContext(self._parallel_decorator, self._parallel_context)
 
     def _parallel_decorator(self, func):
@@ -49,6 +53,7 @@ class CircuitInterface:
     def subcircuit(self):
         """Decorator that registers a function as a subcircuit block that can
         be inserted later."""
+        self._verify_outside_circuit("subcircuit")
         return DecoratorOrContext(self._subcircuit_decorator, self._subcircuit_context)
 
     def _subcircuit_decorator(self, func, argument=1):
@@ -61,6 +66,7 @@ class CircuitInterface:
     def loop(self):
         """Decorator that registers a function as a loop that can be inserted
         later."""
+        self._verify_outside_circuit("loop")
         return DecoratorOrContext(self._loop_decorator, self._loop_context)
 
     def _loop_decorator(self, func, repeats):
@@ -68,6 +74,15 @@ class CircuitInterface:
 
     def _loop_context(self, *args):
         raise JaqalError(f"Use the Q object to open a loop context")
+
+    def _verify_outside_circuit(self, name):
+        if self._in_circuit_instantiation:
+            msg = (
+                f"@circuit.{name} decorators may not be nested or defined "
+                + f"inside a circuit definition. Either move this definition to "
+                + f"global scope, or use @Q.{name} when inside a circuit definition."
+            )
+            raise JaqalError(msg)
 
     def __call__(
         self,
@@ -94,15 +109,19 @@ class CircuitInterface:
         def outer(func):
             @functools.wraps(func)
             def inner(*args, **kwargs):
-                stack = Stack()
-                qsyntax = Q(stack, dict(self._blocks))
-                with stack.frame():
-                    func(qsyntax, *args, **kwargs)
-                    return circuit_from_stack(
-                        qsyntax,
-                        inject_pulses=inject_pulses,
-                        autoload_pulses=autoload_pulses,
-                    )
+                try:
+                    self._in_circuit_instantiation = True
+                    stack = Stack()
+                    qsyntax = Q(stack, dict(self._blocks))
+                    with stack.frame():
+                        func(qsyntax, *args, **kwargs)
+                        return circuit_from_stack(
+                            qsyntax,
+                            inject_pulses=inject_pulses,
+                            autoload_pulses=autoload_pulses,
+                        )
+                finally:
+                    self._in_circuit_instantiation = False
 
             argspec = getfullargspec(func)
             default_count = len(argspec.defaults) if argspec.defaults else 0

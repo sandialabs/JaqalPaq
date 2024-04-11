@@ -657,6 +657,40 @@ class QsyntaxTester(unittest.TestCase):
         text = "register r[2]; prepare_all; loop 10 {Foo r[0]}; measure_all"
         self.run_test(func, text)
 
+    def test_no_nested_global_block_decorator(self):
+        """Test we cannot nest global block decorators."""
+
+        @circuit.sequential
+        def foo(Q, r):
+            @circuit.sequential
+            def bar(Q, i):
+                Q.Foo(r[i])
+
+            Q.bar(r, 0)
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.foo(r)
+
+        with self.assertRaises(JaqalError):
+            func()
+
+    def test_no_global_in_circuit_decorator(self):
+        """Test we cannot nest a global block decorator in a circuit."""
+
+        @circuit
+        def func(Q):
+            @circuit.sequential
+            def foo(Q, r):
+                Q.Foo(r, 0)
+
+            r = Q.register(2, "r")
+            Q.foo(r)
+
+        with self.assertRaises(JaqalError):
+            func()
+
     def run_test(self, func, text, *args, inject_pulses=None):
         func_circ = func(*args)
         text_circ = parse_jaqal_string(
