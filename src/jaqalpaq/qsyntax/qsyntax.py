@@ -6,7 +6,8 @@ from contextlib import contextmanager
 import importlib
 import functools
 from typing import Any
-from inspect import getfullargspec
+from inspect import getfullargspec, currentframe
+import warnings
 
 from jaqalpaq.error import JaqalError
 from jaqalpaq.core.circuitbuilder import build
@@ -106,13 +107,15 @@ class CircuitInterface:
 
         """
 
+        context = ContextLookup(currentframe().f_back)
+
         def outer(func):
             @functools.wraps(func)
             def inner(*args, **kwargs):
                 try:
                     self._in_circuit_instantiation = True
                     stack = Stack()
-                    qsyntax = Q(stack, dict(self._blocks))
+                    qsyntax = Q(stack, dict(self._blocks), context)
                     with stack.frame():
                         func(qsyntax, *args, **kwargs)
                         return circuit_from_stack(
@@ -133,6 +136,29 @@ class CircuitInterface:
             return outer
 
 
+class ContextLookup:
+    """Look up a particular symbol in the context given by a stack
+    frame. Saves the original context, so that we can also detect
+    changes in the context."""
+
+    def __init__(self, frame):
+        if frame is not None:
+            self._locals = dict(frame.f_locals)
+            self._globals = dict(frame.f_globals)
+        else:
+            self._locals = self._globals = {}
+
+    def __contains__(self, key):
+        return key in self._locals or key in self._globals
+
+    def __getitem__(self, key):
+        try:
+            return self._locals[key]
+        except Exception:
+            pass
+        return self._globals[key]
+
+
 # The primary way the user will interface with Qsyntax. When used as a
 # decorator on a function, creates a circuit. It can also be used to
 # register certain global objects.
@@ -146,24 +172,48 @@ class Q:
 
     """
 
-    def __init__(self, stack, blocks):
+    def __init__(self, stack, blocks, context):
         # A stack mimicking the structure of the Jaqal program
         self._stack = stack
         # Stored blocks that are inserted later. Similar to macros but
         # not implemented using Jaqal macros.
         self._blocks = blocks
+        # The context in which the circuit was declared
+        self._context = context
 
     def __getattr__(self, name):
-        """Return an object that represents a gate wiith an unknown
+        """Return an object that represents a gate with an unknown
         definition.
 
         :param string name: The name of the gate
         """
 
         if name in self._blocks:
+            self._check_block_context(name)
             return self._make_block(*self._blocks[name])
 
         return QGate(name, self._stack)
+
+    def _check_block_context(self, name):
+        """Check if the given block is found in the context, and if it
+        is, but doesn't match the one we are about to use, issue a
+        warning."""
+        if name not in self._context:
+            return
+        ctx_obj = self._context[name]
+        if not hasattr(ctx_obj, "__wrapped__"):
+            # Something has the same name as the block, but isn't a block
+            return
+        blk = self._blocks[name][0]
+        if ctx_obj.__wrapped__ is not blk:
+            msg = (
+                f"When looking up block {name}, the actual block differs "
+                + "from the one in the calling context. This might mean you "
+                + "are using a different block definition than you expect. If "
+                + f"you intended to override {name}, consider deleting it in "
+                + "the calling context."
+            )
+            warnings.warn(msg)
 
     def _make_block(self, func, context_name, *ctxargs):
         """Create a block from a function that was stored earlier."""

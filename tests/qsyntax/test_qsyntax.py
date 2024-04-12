@@ -1,4 +1,5 @@
 import unittest
+import warnings
 
 from jaqalpaq.qsyntax import circuit
 from jaqalpaq.parser import parse_jaqal_string
@@ -690,6 +691,91 @@ class QsyntaxTester(unittest.TestCase):
 
         with self.assertRaises(JaqalError):
             func()
+
+    def test_warn_overwriting_global_block(self):
+        """Test when overwriting a global block after defining a circuit we get a warning."""
+
+        @circuit.sequential
+        def foo(Q, r):
+            Q.Foo(r[0])
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.foo(r)
+
+        @circuit.sequential
+        def foo(Q, r):
+            Q.Bar(r[0])
+
+        with self.assertWarns(Warning):
+            func()
+
+    def test_warn_global_block_not_in_calling_scope(self):
+        """Warn when the global block used in the caller's scope differs."""
+
+        @circuit.sequential
+        def foo(Q, r):
+            Q.Foo(r[0])
+
+        # Simulate another module or whatever creating their own version of foo
+        def make_foo():
+            @circuit.sequential
+            def foo(Q, r):
+                Q.Bar(r[0])
+
+        make_foo()
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.foo(r)
+
+        with self.assertWarns(Warning):
+            func()
+
+    def test_global_block_not_in_scope_ok(self):
+        """Test that we don't warn just because a block is not in scope."""
+
+        # Simulate another module or whatever creating their own version of foo
+        def make_foo():
+            @circuit.sequential
+            def foo(Q, r):
+                Q.Bar(r[0])
+
+        make_foo()
+
+        def run_make_circuit():
+            @circuit
+            def func(Q):
+                r = Q.register(2, "r")
+                Q.foo(r)
+
+            return func()
+
+        with warnings.catch_warnings(record=True) as catcher:
+            warnings.simplefilter("always")
+            run_make_circuit()
+            self.assertEqual(len(catcher), 0)
+
+    def test_thing_with_same_name_as_global_block_ok(self):
+        """Test that we don't warn just because something has the same name as a global block."""
+
+        @circuit.sequential
+        def foo(Q, r):
+            Q.Bar(r[0])
+
+        foo = 42
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.foo(r)
+
+        with warnings.catch_warnings(record=True) as catcher:
+            warnings.simplefilter("always")
+            func()
+            self.assertEqual(len(catcher), 0)
 
     def run_test(self, func, text, *args, inject_pulses=None):
         func_circ = func(*args)
