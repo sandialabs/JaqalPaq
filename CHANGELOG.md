@@ -1,3 +1,14 @@
+Changes in 1.3
+==============
+
+ - NEW: Add support for more QSCOUT gates
+ - NEW: Expose default `__repeats__` setting
+ - NEW: Batching support in Cirq and Qiskit transpilers
+ - IMPROVED: Better Cirq and Qiskit compatibility
+ - CHANGED: ZZ gate is now in qscout.v1.std
+ - FIXED: Various Jaqal parsing/generation cases
+ - FIXED: Various QSyntax cases
+
 Changes in 1.2
 ==============
 
