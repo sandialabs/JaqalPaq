@@ -1,3 +1,12 @@
+Changes in 1.2
+==============
+
+ - NEW: ExecutionResults API
+ - NEW: Batching and Let override controls
+ - NEW: IPC framework for execution on actual hardware
+ - CHANGED: `get_jaqal_action` for noiseless emulation
+ - DEPRECATED: Pre-1.2 ExecutionResults API
+
 Changes in 1.1
 ==============
 
