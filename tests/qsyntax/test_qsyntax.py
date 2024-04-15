@@ -692,6 +692,25 @@ class QsyntaxTester(unittest.TestCase):
         with self.assertRaises(JaqalError):
             func()
 
+    def test_no_global_in_local_decorator(self):
+        """Test we cannot nest a global block decorator in a local block decorator."""
+
+        @circuit
+        def func(Q):
+            @Q.parallel
+            def foo(Q, r):
+                @circuit.sequential
+                def bar(Q, r):
+                    Q.Foo(r, 0)
+
+                Q.bar(r)
+
+            r = Q.register(2, "r")
+            Q.foo(r)
+
+        with self.assertRaises(JaqalError):
+            func()
+
     def test_warn_overwriting_global_block(self):
         """Test when overwriting a global block after defining a circuit we get a warning."""
 
