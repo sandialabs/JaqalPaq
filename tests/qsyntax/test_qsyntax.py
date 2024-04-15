@@ -494,7 +494,7 @@ class QsyntaxTester(unittest.TestCase):
         self.run_test(func, text)
 
     def test_subcircuit_function_nesting_error(self):
-        """Test using a function with a Q.subcircuit decorator."""
+        """Test nesting an explicit subcircuit in an implicit one."""
 
         @circuit
         def func(Q):
@@ -508,6 +508,36 @@ class QsyntaxTester(unittest.TestCase):
 
         with self.assertRaises(JaqalError):
             func()
+
+    def test_explicit_prepare_no_subcircuit(self):
+        """Test that a circuit that starts with a prepare_all statement doesn't have an implicit subcircuit."""
+
+        @circuit
+        def func(Q):
+            r = Q.register(2, "r")
+            Q.prepare_all()
+            Q.Foo(r[0])
+            Q.measure_all()
+
+        text = "register r[2]; prepare_all; Foo r[0]; measure_all"
+        self.run_test(func, text)
+
+    def test_explicit_prepare_block_no_subcircuit(self):
+        """Test that a circuit that starts with a block containing a prepare_all statement doesn't have an implicit subcircuit."""
+
+        @circuit
+        def func(Q):
+            @Q.sequential
+            def make_body(Q, r):
+                Q.prepare_all()
+                Q.Foo(r[0])
+                Q.measure_all()
+
+            r = Q.register(2, "r")
+            Q.make_body(r)
+
+        text = "register r[2]; {prepare_all; Foo r[0]; measure_all}"
+        self.run_test(func, text)
 
     def test_subcircuit_function_standalone(self):
         """Test using a function with a Q.subcircuit decorator."""
